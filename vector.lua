@@ -1,6 +1,7 @@
+--- A simple 2D vector.
+
 local vector = {}
 
---- A simple 2D vector.
 vector.Vector = {}
 
 --- Constructor.  Creates a new vector with the given x and y.

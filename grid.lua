@@ -14,8 +14,9 @@ grid.Grid = {}
 function grid.Grid:new(width, height)
   newObj = {
     size = vector.Vector:new(width, height),
-    width = width,
-    height = height,
+    width = width,  -- Width of the grid in tiles
+    height = height,  -- Height of the grid in tiles
+    
     spacesList = {},  -- Set of all unique spaces in the level
     spacesGrid = misc.table2D(width),
   }
@@ -35,7 +36,18 @@ function grid.Grid:isInbounds(col, row)
 
   return false
 end
-  
+
+
+--- Returns the space at the given coordinates.
+-- If the space is outof bounds, then this simply returns nil.
+function grid.Grid:spaceAt(col, row)
+  if self:isInbounds(col, row) then
+    return self.spacesGrid[col][row]
+  end
+    
+  return nil
+end
+
 
 --- Deletes and recreates the adjacent spaces lists of the given space.
 -- The adjacent spaces lists are the four lists that keep track of what spaces
@@ -61,6 +73,7 @@ function grid.Grid:refreshAdjacent(space)
           if adjacentSpace then
             if adjacentSpace ~= space then
               space.adjacent[direction][adjacentSpace] = true
+              table.insert(space.adjacentList, adjacentSpace)
             end
           end
           
@@ -131,8 +144,8 @@ function grid.Grid:fillGapsWithSpaces()
   for x = 1, self.width do
     for y = 1, self.height do
       
-      if not testGrid.spacesGrid[x][y] then
-        testGrid:addCellSpace(x, y)
+      if not self.spacesGrid[x][y] then
+        self:addCellSpace(x, y)
       end
       
     end
@@ -176,8 +189,7 @@ function grid.Grid:attemptSplit(space)
   local startRow
   
   startCol, startRow = space:findACell()
-  print(startCol, startRow)
-  
+
   local toSearch = {{x = startCol, y = startRow}}
   
   while #toSearch > 0 do
@@ -194,7 +206,6 @@ function grid.Grid:attemptSplit(space)
       if self:isInbounds(point.x, point.y) then  -- Must be inbounds
         if not connected[point.x][point.y] then  -- Must not already been searched
           if self.spacesGrid[point.x][point.y] == space then  -- Must be part of the space
-            print(point.x, point.y)
             table.insert(toSearch, point)
           end
         end
@@ -205,8 +216,7 @@ function grid.Grid:attemptSplit(space)
     -- Remove the point that was just searched from the search list
     table.remove(toSearch, 1)
   end
-  print()
- 
+
   local allConnected = true
   local pointList = {}
   
@@ -290,6 +300,26 @@ function grid.Grid:deleteCell(col, row)
   
   self.spacesGrid[col][row] = nil  -- Remove the cell from the grid
   
+end
+
+
+function grid.Grid:drawDebug(xOffset, yOffset, tileSize)
+  local x
+  local y
+  
+  for colNum, col in pairs(self.spacesGrid) do
+    for rowNum, space in pairs(col) do
+      x = (colNum - 1) * tileSize + xOffset
+      y = (rowNum - 1) * tileSize + yOffset
+      
+      if self:spaceAt(colNum - 1, rowNum) ~= space then
+        love.graphics.rectangle("fill", x, y, 2, tileSize)
+      end
+      if self:spaceAt(colNum, rowNum - 1) ~= space then
+        love.graphics.rectangle("fill", x, y, tileSize, 2)
+      end
+    end
+  end
 end
 
 return grid

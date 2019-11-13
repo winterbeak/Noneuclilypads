@@ -20,6 +20,7 @@ function spaces.Space:new(col, row)
       right = {},
       down = {}
     },
+    adjacentList = {},
     
     leftMost = col,
     rightmost = col,
@@ -45,6 +46,7 @@ function spaces.Space:emptyAdjacent()
     right = {},
     down = {}
   }
+  self.adjacentList = {}
 end
 
 

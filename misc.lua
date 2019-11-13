@@ -26,4 +26,13 @@ function misc.adjacentPoints(x, y)
   }
 end
 
+
+--- Returns the string value of a boolean.
+function misc.boolString(boolean)
+  if boolean then
+    return "true"
+  end
+  return "false"
+end
+
 return misc

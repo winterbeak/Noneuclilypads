@@ -3,10 +3,12 @@
 local misc = require("misc")
 local grid = require("grid")
 local bodies = require("bodies")
+local spaces = require("spaces")
 
 local gridXOffset = 150
 local gridYOffset = 50
-local tileSize = 100
+local pixelScale = 5
+local tileSize = (pixelScale * spaces.singlePadsSprite.width)
 
 
 --- Returns the x of the left side of a column.
@@ -137,6 +139,10 @@ end
 --- Runs every frame.
 function love.draw()
   level:drawDebug(gridXOffset, gridYOffset, tileSize)
+  
+  for space, _ in pairs(level.spacesList) do
+    space:draw(gridXOffset, gridYOffset, pixelScale)
+  end
   
   for colNum, col in pairs(player.space.cells) do
     for rowNum, _ in pairs(col) do

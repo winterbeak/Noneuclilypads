@@ -4,6 +4,7 @@ local const = require("const")
 local misc = require("misc")
 local vector = require("vector")
 local spaces = require("spaces")
+local graphics = require("graphics")
 
 local grid = {}
 
@@ -102,7 +103,41 @@ end
 -- Make sure to refreshAllAdjacent() at some point after using this function
 -- to keep the adjacent lists updated properly.
 function grid.Grid:addCellSpace(col, row)
-  local newSpace = spaces.Space:new(col, row)
+  
+  -- Randomly chooses a sprite number that isn't equal to any adjacent sprites
+  local space
+  local spriteNum
+  local equalsAdjacent = true
+  
+  while equalsAdjacent do
+    equalsAdjacent = false
+    
+    spriteNum = math.random(1, spaces.singlePadsSprite.spriteCount)
+    
+    -- Checks all adjacent cells
+    for direction, point in pairs(misc.adjacentPoints(col, row)) do
+      if self:isInbounds(point.x, point.y) then
+        space = self.spacesGrid[point.x][point.y]
+        
+        if space then  -- If a space exists there
+          if space:isSingleCell() then  -- If the space is single-celled
+            if space.spriteNum == spriteNum then  -- If the sprite is equal
+              
+              -- Loop from the start, randomly choosing another sprite number
+              equalsAdjacent = true
+              break
+              
+            end
+          end
+        end
+        
+      end
+    end
+    
+  end
+
+  -- Creates the space and adds it to the grid
+  local newSpace = spaces.Space:new(col, row, spriteNum)
   self.spacesGrid[col][row] = newSpace
   self.spacesList[newSpace] = true
 end

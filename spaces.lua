@@ -2,16 +2,19 @@
 -- Note that spaces cannot work by themselves.  Please do not use any of the
 -- below function; only interact with spaces using Grid's commands.
 
+local graphics = require("graphics")
 local const = require("const")
 local vector = require("vector")
 local misc = require("misc")
 
 local spaces = {}
 
+spaces.singlePadsSprite = graphics.SpriteSheet:new("singlePads.png", 16)
+
 spaces.Space = {}
 
 --- Constructor.  Makes a new Space at the given coordinates.
-function spaces.Space:new(col, row)
+function spaces.Space:new(col, row, spriteNum)
   local newObj = {
     cells = misc.table2D(const.MAX_GRID_W),
     adjacent = {
@@ -21,14 +24,10 @@ function spaces.Space:new(col, row)
       down = {}
     },
     adjacentList = {},
+
+    occupiedBy = nil,
     
-    leftMost = col,
-    rightmost = col,
-    topMost = row,
-    bottomMost = row,
-    maxWidth = 1,
-    maxHeight = 1,
-    occupiedBy = nil
+    spriteNum = spriteNum or 0
   }
   
   newObj.cells[col][row] = true
@@ -50,46 +49,6 @@ function spaces.Space:emptyAdjacent()
 end
 
 
---- Updates the bounds of the space.
--- This includes the leftmost, topmost, rightmost, and bottommost cells
--- as well as the width and height of the space.
-function spaces.Space:updateBounds()
-  local leftMost = const.MAX_GRID_W + 1
-  local rightMost = -1
-  local topMost = const.MAX_GRID_H + 1
-  local bottomMost = -1
-  
-  -- Loops through all the cells in the grid to find the maximums
-  for colNum, col in pairs(self.cells) do
-    for rowNum, _ in pairs(col) do
-
-      if colNum < leftMost then
-        leftMost = colNum
-      end
-      if colNum > rightMost then
-        rightMost = colNum
-      end
-      if rowNum < topMost then
-        topMost = rowNum
-      end
-      if rowNum > bottomMost then
-        bottomMost = rowNum
-      end
-    end
-  end
-  
-  self.leftMost = leftMost
-  self.rightMost = rightMost
-  self.topMost = topMost
-  self.bottomMost = bottomMost
-  
-  -- Calculate the new width and height
-  self.width = rightMost - leftMost + 1
-  self.height = bottomMost - topMost + 1
-  
-end
-
-
 --- Adds the cells of another space to this one.
 -- Note that the other space is not affected in any way.
 function spaces.Space:mergeCells(otherSpace)
@@ -98,8 +57,6 @@ function spaces.Space:mergeCells(otherSpace)
       self.cells[colNum][rowNum] = true
     end
   end
-  
-  self:updateBounds()
 end
 
 
@@ -112,18 +69,39 @@ function spaces.Space:mergeCellsMultiple(spaceList)
       end
     end
   end
-  
-  self:updateBounds()
 end
 
 
 --- Returns true if the space is only 1x1.
 function spaces.Space:isSingleCell()
-  if self.width == 1 and self.height == 1 then
-    return true
+  local foundCell = false
+  local foundCellInCol
+  
+  -- For every column
+  for colNum, col in pairs(self.cells) do
+    
+    foundCellInCol = false
+
+    for rowNum, _ in pairs(col) do
+      
+      -- If a cell was already found in this column then return false
+      if foundCellInCol then
+        return false
+      end
+      
+      foundCellInCol = true
+    end
+    
+    -- If a cell was found in this column and also another column, return false
+    if foundCellInCol and foundCell then
+      return false
+    end
+    
+    foundCell = foundCellInCol
+
   end
   
-  return false
+  return true
 end
 
 
@@ -135,16 +113,35 @@ function spaces.Space:removeCell(col, row)
   end
   
   self.cells[col][row] = nil
-  self:updateBounds()
 end
+
 
 --- Finds a cell, any cell, that the space contains, and returns its coordinates.
 -- Returns two values: the first is the column number, and the second is the row number.
 function spaces.Space:findACell()
   for colNum, col in pairs(self.cells) do
-    for rowNum, row in pairs(col) do
+    for rowNum, _ in pairs(col) do
       return colNum, rowNum
     end
+  end
+end
+
+
+--- Draws the space.
+-- gridX and gridY are the pixel coordinates of the top left of the space's grid.
+-- scale is how big to scale the art.
+function spaces.Space:draw(gridX, gridY, scale)
+  local x
+  local y
+  
+  if self:isSingleCell() then
+    local col, row = self:findACell()
+    local cellSize = spaces.singlePadsSprite.width * scale
+
+    x = gridX + (cellSize * (col - 1))
+    y = gridY + (cellSize * (row - 1))
+
+    spaces.singlePadsSprite:draw(self.spriteNum, x, y, scale)
   end
 end
 

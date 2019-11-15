@@ -35,4 +35,18 @@ function misc.boolString(boolean)
   return "false"
 end
 
+
+-- Converts a list of booleans into 
+-- The list of booleans must be numerically indexed.
+function misc.toBits(booleanList)
+  bits = 0
+  for i = 1, #booleanList do
+    if booleanList[i] then
+      bits = bit.bor(bits, bit.lshift(1, i - 1))
+    end
+  end
+  return bits
+end
+
+
 return misc

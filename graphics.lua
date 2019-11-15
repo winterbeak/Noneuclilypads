@@ -1,11 +1,34 @@
 local graphics = {}
 
-graphics.SpriteSheet = {}
+
 
 graphics.scale = 4
 
+graphics.COLOR_WHITE = {255, 255, 255}
+graphics.COLOR_BLACK = {0, 0, 0}
+graphics.COLOR_LILLYPAD = {145, 206, 50}
+graphics.COLOR_LILLYPAD_SHADOW = {94, 153, 0}
+graphics.COLOR_WATER = {0, 255, 182}
+
+
+
 -- Changes the resampling mode so that pixel art is crisp when resized.
 love.graphics.setDefaultFilter("nearest", "nearest")
+
+
+--- Sets love's drawing color, given a 4-number list representing the rgba value.
+-- This rgba differes from love's in that it sets the color based on a 0-255 scale.
+function graphics.setColor(colorList)
+  actualColor = {}
+  for i = 1, #colorList do
+    actualColor[i] = colorList[i] / 255
+  end
+  
+  love.graphics.setColor(actualColor)
+end
+
+
+graphics.SpriteSheet = {}
 
 --- Constructor.  Creates a new spritesheet.
 -- The sprites must all be in one vertical column.
@@ -47,5 +70,6 @@ function graphics.SpriteSheet:drawRandom(x, y, scale)
   local quad = math.random(1, self.spriteCount)
   love.graphics.draw(self.image, self.quads[quad], x, y, 0, scale, scale)
 end
+
 
 return graphics

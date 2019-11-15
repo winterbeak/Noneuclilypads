@@ -16,8 +16,12 @@ end
 
 --- Makes the body move to a given space.
 function bodies.WarpBody:moveTo(space, direction)
+  self.space.occupiedBy = nil
+  space.occupiedBy = self
+  
   self.previousSpace = self.space
   self.space = space
+  
   self.moveDirection = direction
 end
 

@@ -4,10 +4,11 @@ local misc = require("misc")
 local grid = require("grid")
 local bodies = require("bodies")
 local spaces = require("spaces")
+local graphics = require("graphics")
 
 local gridXOffset = 150
 local gridYOffset = 50
-local pixelScale = 5
+local pixelScale = 4
 local tileSize = (pixelScale * spaces.singlePadsSprite.width)
 
 
@@ -77,12 +78,14 @@ function love.load()
   -- Generates level
   level = grid.Grid:new(5, 5)
 
-  -- Makes an upside down L shaped space
   local pointList = {
-    {x=2, y=2},
+    {x=2, y=1},
+    {x=3, y=1},
     {x=3, y=2},
     {x=3, y=3},
-    {x=3, y=4},
+    {x=2, y=3},
+    {x=4, y=3},
+    {x=3, y=4}
   }
 
   level:addSpace(pointList)
@@ -113,6 +116,7 @@ end
 
 --- Runs every frame.
 function love.update()
+
   updateMouse()
 
   if mouseReleased then
@@ -136,8 +140,11 @@ function drawDebugCell(r, g, b, col, row)
   love.graphics.setColor(255, 255, 255)
 end
 
+
 --- Runs every frame.
 function love.draw()
+  love.graphics.setBackgroundColor(graphics.COLOR_WATER)
+  
   level:drawDebug(gridXOffset, gridYOffset, tileSize)
   
   for space, _ in pairs(level.spacesList) do

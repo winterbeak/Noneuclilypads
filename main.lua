@@ -8,8 +8,8 @@ local graphics = require("graphics")
 
 local gridXOffset = 150
 local gridYOffset = 50
-local pixelScale = 4
-local tileSize = (pixelScale * spaces.singlePadsSprite.width)
+local pixel = 4
+local tileSize = (pixel * spaces.singlePadsSprite.width)
 
 
 --- Returns the x of the left side of a column.
@@ -101,7 +101,6 @@ function love.load()
   level:refreshAllAdjacent()
   
   
-
   player = bodies.WarpBody:new(level.spacesGrid[4][4])
 
   CHOOSE_DIRECTION = 1
@@ -115,6 +114,8 @@ function love.load()
   mouseHeld = false
   mouseReleased = false
   mouseDownPreviousFrame = false
+  
+  mouseSpace = nil
 end
 
 
@@ -122,10 +123,10 @@ end
 function love.update()
 
   updateMouse()
+  mouseSpace = spaceAt(level, love.mouse.getX(), love.mouse.getY())
 
   if mouseReleased then
-    local mouseSpace = spaceAt(level, love.mouse.getX(), love.mouse.getY())
-    
+
     for direction, spaceList in pairs(player.space.adjacent) do
       for space, _ in pairs(spaceList) do
         if (space == mouseSpace) then
@@ -147,25 +148,50 @@ end
 
 --- Runs every frame.
 function love.draw()
+  local highlighted
+  
   love.graphics.setBackgroundColor(graphics.COLOR_WATER)
   
   level:drawDebug(gridXOffset, gridYOffset, tileSize)
   
   for space, _ in pairs(level.spacesList) do
-    space:draw(gridXOffset, gridYOffset, pixelScale, pixelScale*2, pixelScale*2)
+    highlighted = false
+    
+    if space.occupiedBy == player then
+      highlighted = true
+      
+    else
+      for index, adjacentSpace in pairs(space.adjacentList) do
+        if adjacentSpace.occupiedBy == player then
+          highlighted = true
+          break
+        end
+      end
+      
+    end
+    
+    -- "Compresses" a space if the mouse is hovering over it.
+    if highlighted and space == mouseSpace then
+      
+      -- If the mouse is being held, compress it more
+      if mouseHeld then
+        space:draw(gridXOffset + pixel*2, gridYOffset + pixel*2, pixel, 0, 0, highlighted)
+        
+      -- Otherwise, compress it the normal amount
+      else
+        space:draw(gridXOffset + pixel, gridYOffset + pixel, pixel, pixel, pixel, highlighted)
+      end
+      
+    -- Otherwise, draws the space normally
+    else
+      space:draw(gridXOffset, gridYOffset, pixel, pixel*2, pixel*2, highlighted)
+    end
+    
   end
   
   for colNum, col in pairs(player.space.cells) do
     for rowNum, _ in pairs(col) do
       drawDebugCell(255, 0, 0, colNum, rowNum)
-    end
-  end
-  
-  for index, space in pairs(player.space.adjacentList) do
-    for colNum, col in pairs(space.cells) do
-      for rowNum, _ in pairs(col) do
-        drawDebugCell(255, 255, 0, colNum, rowNum)
-      end
     end
   end
 

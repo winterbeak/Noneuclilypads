@@ -7,7 +7,9 @@ function bodies.WarpBody:new(startSpace)
     space = startSpace,
     previousSpace = nil,
     moveDirection = "left"
-    }
+  }
+  
+  startSpace.occupiedBy = newObj
   
   self.__index = self
   return setmetatable(newObj, self)

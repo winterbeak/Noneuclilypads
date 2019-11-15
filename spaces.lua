@@ -10,7 +10,10 @@ local misc = require("misc")
 local spaces = {}
 
 spaces.singlePadsSprite = graphics.SpriteSheet:new("singlePads.png", 16)
+spaces.singlePadsHighlightSprite = graphics.SpriteSheet:new("singlePadsHighlighted.png", 16)
+
 spaces.multiPadsSprite = graphics.SpriteSheet:new("multiPads.png", 15)
+spaces.multiPadsHighlightSprite = graphics.SpriteSheet:new("multiPadsHighlighted.png", 15)
 
 
 --- Draws a square, and its shadow if an offset is given.
@@ -173,34 +176,53 @@ end
 --- Draws the space.
 -- gridX and gridY are the pixel coordinates of the top left of the space's grid.
 -- scale is how big to scale the art.
-function spaces.Space:draw(gridX, gridY, scale, shadowOffsetX, shadowOffsetY)
+function spaces.Space:draw(gridX, gridY, scale, shadowOffsetX, shadowOffsetY, isSelected)
   local x
   local y
+  local spriteSheet
   local cellSize = spaces.singlePadsSprite.width * scale
   
   -- Draws a single cell space
   if self:isSingleCell() then
     local col, row = self:findACell()
     
+    if isSelected then
+      spriteSheet = spaces.singlePadsHighlightSprite
+    else
+      spriteSheet = spaces.singlePadsSprite
+    end
+    
     x = gridX + (cellSize * (col - 1))
     y = gridY + (cellSize * (row - 1))
     
     -- Draws the shadow
     graphics.setColor(graphics.COLOR_WATER_SHADOW)
-    spaces.singlePadsSprite:draw(self.spriteNum, x + shadowOffsetX, y + shadowOffsetY, scale)
+    spriteSheet:draw(self.spriteNum, x + shadowOffsetX, y + shadowOffsetY, scale)
     
     -- Draws the sprite itself
     graphics.setColor(graphics.COLOR_WHITE)
-    spaces.singlePadsSprite:draw(self.spriteNum, x, y, scale)
+    spriteSheet:draw(self.spriteNum, x, y, scale)
     
   -- Draws a multicell space
-  else
+else
+    local lillypadColor
+    local lillypadShadowColor
     local spriteId
     local left
     local up
     local right
     local down
     local pixel = scale
+    
+    if isSelected then
+      spriteSheet = spaces.multiPadsHighlightSprite
+      lillypadColor = graphics.COLOR_LILLYPAD_HIGHLIGHT
+      lillypadShadowColor = graphics.COLOR_LILLYPAD_SHADOW_HIGHLIGHT
+    else
+      spriteSheet = spaces.multiPadsSprite
+      lillypadColor = graphics.COLOR_LILLYPAD
+      lillypadShadowColor = graphics.COLOR_LILLYPAD_SHADOW
+    end
     
     for colNum, col in pairs(self.cells) do
       for rowNum, _ in pairs(col) do
@@ -219,11 +241,11 @@ function spaces.Space:draw(gridX, gridY, scale, shadowOffsetX, shadowOffsetY)
         
         -- Draws shadow
         graphics.setColor(graphics.COLOR_WATER_SHADOW)
-        spaces.multiPadsSprite:draw(spriteNum, x + shadowOffsetX, y + shadowOffsetY, scale)
+        spriteSheet:draw(spriteNum, x + shadowOffsetX, y + shadowOffsetY, scale)
         
         -- Draws the sprite
         graphics.setColor(graphics.COLOR_WHITE)
-        spaces.multiPadsSprite:draw(spriteNum, x, y, scale)
+        spriteSheet:draw(spriteNum, x, y, scale)
 
         -- Draws the corner edge cases, pixel by pixel
         -- This is kinda dumb but i don't want to make more functions that pass around
@@ -247,7 +269,7 @@ function spaces.Space:draw(gridX, gridY, scale, shadowOffsetX, shadowOffsetY)
             drawSquare(pixel, x, y + pixel)
             drawSquare(pixel, x + pixel, y + pixel)
             
-            graphics.setColor(graphics.COLOR_LILLYPAD)
+            graphics.setColor(lillypadColor)
             drawSquare(pixel, x, y + pixel*2)
           end
         
@@ -256,7 +278,7 @@ function spaces.Space:draw(gridX, gridY, scale, shadowOffsetX, shadowOffsetY)
             drawSquare(pixel, x + pixel, y)
             drawSquare(pixel, x + pixel, y + pixel)
             
-            graphics.setColor(graphics.COLOR_LILLYPAD)
+            graphics.setColor(lillypadColor)
             drawSquare(pixel, x + pixel*2, y)
           end
         end
@@ -270,7 +292,7 @@ function spaces.Space:draw(gridX, gridY, scale, shadowOffsetX, shadowOffsetY)
             drawSquare(pixel, x + cellSize - pixel, y)
             drawSquare(pixel, x + cellSize - pixel*2, y)
             
-            graphics.setColor(graphics.COLOR_LILLYPAD_SHADOW)
+            graphics.setColor(lillypadColor)
             drawSquare(pixel, x + cellSize - pixel*3, y)
             drawSquare(pixel, x + cellSize - pixel*2, y + pixel)
           end
@@ -280,7 +302,7 @@ function spaces.Space:draw(gridX, gridY, scale, shadowOffsetX, shadowOffsetY)
             drawSquare(pixel, x + cellSize - pixel, y + pixel)
             drawSquare(pixel, x + cellSize - pixel*2, y + pixel)
             
-            graphics.setColor(graphics.COLOR_LILLYPAD)
+            graphics.setColor(lillypadColor)
             drawSquare(pixel, x + cellSize - pixel, y + pixel*2)
           end
         
@@ -289,7 +311,7 @@ function spaces.Space:draw(gridX, gridY, scale, shadowOffsetX, shadowOffsetY)
             drawSquare(pixel, x + cellSize - pixel*2, y, shadowOffsetX, shadowOffsetY)
             drawSquare(pixel, x + cellSize - pixel*2, y + pixel, shadowOffsetX, shadowOffsetY)
             
-            graphics.setColor(graphics.COLOR_LILLYPAD_SHADOW)
+            graphics.setColor(lillypadShadowColor)
             drawSquare(pixel, x + cellSize - pixel*3, y)
           end
         end
@@ -303,7 +325,7 @@ function spaces.Space:draw(gridX, gridY, scale, shadowOffsetX, shadowOffsetY)
             drawSquare(pixel, x + cellSize - pixel, y + cellSize - pixel)
             drawSquare(pixel, x + cellSize - pixel, y + cellSize - pixel*2)
             
-            graphics.setColor(graphics.COLOR_LILLYPAD_SHADOW)
+            graphics.setColor(lillypadShadowColor)
             drawSquare(pixel, x + cellSize - scale, y + cellSize - scale*3)
             drawSquare(pixel, x + cellSize - scale*2, y + cellSize - scale*3)
             drawSquare(pixel, x + cellSize - scale*2, y + cellSize - scale*2)
@@ -317,10 +339,10 @@ function spaces.Space:draw(gridX, gridY, scale, shadowOffsetX, shadowOffsetY)
             drawSquare(pixel, x + cellSize - scale*2, y + cellSize - scale*2, shadowOffsetX, shadowOffsetY)
             drawSquare(pixel, x + cellSize - scale, y + cellSize - scale*2)
             
-            graphics.setColor(graphics.COLOR_LILLYPAD)
+            graphics.setColor(lillypadColor)
             drawSquare(pixel, x + cellSize - scale, y + cellSize - scale*4)
             
-            graphics.setColor(graphics.COLOR_LILLYPAD_SHADOW)
+            graphics.setColor(lillypadShadowColor)
             drawSquare(pixel, x + cellSize - scale, y + cellSize - scale*3)
           end
         
@@ -329,10 +351,10 @@ function spaces.Space:draw(gridX, gridY, scale, shadowOffsetX, shadowOffsetY)
             drawSquare(pixel, x + cellSize - scale*2, y + cellSize - scale*2, shadowOffsetX, shadowOffsetY)
             drawSquare(pixel, x + cellSize - scale*2, y + cellSize - scale)
             
-            graphics.setColor(graphics.COLOR_LILLYPAD)
+            graphics.setColor(lillypadColor)
             drawSquare(pixel, x + cellSize - scale*4, y + cellSize - scale)
             
-            graphics.setColor(graphics.COLOR_LILLYPAD_SHADOW)
+            graphics.setColor(lillypadShadowColor)
             drawSquare(pixel, x + cellSize - scale*3, y + cellSize - scale)
           end
         end
@@ -346,7 +368,7 @@ function spaces.Space:draw(gridX, gridY, scale, shadowOffsetX, shadowOffsetY)
             drawSquare(pixel, x, y + cellSize - pixel)
             drawSquare(pixel, x + pixel, y + cellSize - pixel)
             
-            graphics.setColor(graphics.COLOR_LILLYPAD_SHADOW)
+            graphics.setColor(lillypadShadowColor)
             drawSquare(pixel, x, y + cellSize - pixel*3)
             drawSquare(pixel, x + pixel, y + cellSize - pixel*2)
             
@@ -357,7 +379,7 @@ function spaces.Space:draw(gridX, gridY, scale, shadowOffsetX, shadowOffsetY)
             drawSquare(pixel, x, y + cellSize - pixel*2, shadowOffsetX, shadowOffsetY)
             drawSquare(pixel, x + pixel, y + cellSize - pixel*2, shadowOffsetX, shadowOffsetY)
             
-            graphics.setColor(graphics.COLOR_LILLYPAD_SHADOW)
+            graphics.setColor(lillypadShadowColor)
             drawSquare(pixel, x, y + cellSize - pixel*3)
           end
         
@@ -366,7 +388,7 @@ function spaces.Space:draw(gridX, gridY, scale, shadowOffsetX, shadowOffsetY)
             drawSquare(pixel, x + pixel, y + cellSize - pixel*2)
             drawSquare(pixel, x + pixel, y + cellSize - pixel)
             
-            graphics.setColor(graphics.COLOR_LILLYPAD)
+            graphics.setColor(lillypadColor)
             drawSquare(pixel, x + pixel*2, y + cellSize - pixel)
           end
         end

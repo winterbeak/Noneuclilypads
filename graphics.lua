@@ -8,6 +8,8 @@ graphics.COLOR_WHITE = {255, 255, 255}
 graphics.COLOR_BLACK = {0, 0, 0}
 graphics.COLOR_LILLYPAD = {145, 206, 50}
 graphics.COLOR_LILLYPAD_SHADOW = {94, 153, 0}
+graphics.COLOR_LILLYPAD_HIGHLIGHT = {221, 221, 39}
+graphics.COLOR_LILLYPAD_SHADOW_HIGHLIGHT = {176, 176, 37}
 graphics.COLOR_WATER = {0, 255, 182}
 graphics.COLOR_WATER_SHADOW = {0, 0, 0, 76}
 

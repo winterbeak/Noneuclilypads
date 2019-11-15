@@ -72,7 +72,11 @@ end
 
 --- Runs when the game is started.
 function love.load()
+  
+  -- Sets the random seed
+  math.randomseed(os.time())
 
+  -- Prevents the holding of a key
   love.keyboard.setKeyRepeat(false)
   
   -- Generates level
@@ -148,7 +152,7 @@ function love.draw()
   level:drawDebug(gridXOffset, gridYOffset, tileSize)
   
   for space, _ in pairs(level.spacesList) do
-    space:draw(gridXOffset, gridYOffset, pixelScale)
+    space:draw(gridXOffset, gridYOffset, pixelScale, pixelScale*2, pixelScale*2)
   end
   
   for colNum, col in pairs(player.space.cells) do

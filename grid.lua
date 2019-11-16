@@ -20,6 +20,8 @@ function grid.Grid:new(width, height)
     
     spacesList = {},  -- Set of all unique spaces in the level
     spacesGrid = misc.table2D(width),
+    
+    decorCountdown = math.random(1, 3)  -- Countdown towards the next space with a decor
   }
 
   self.__index = self
@@ -107,27 +109,56 @@ function grid.Grid:addCellSpace(col, row)
   -- Randomly chooses a sprite number that isn't equal to any adjacent sprites
   local space
   local spriteNum
+  local directionOffset
+  local decorNum
   local equalsAdjacent = true
+  local rerolls = 0
+  
+  self.decorCountdown = self.decorCountdown - 1
   
   while equalsAdjacent do
     equalsAdjacent = false
     
+    rerolls = rerolls + 1
+    if rerolls > 10 then
+      print("Lillypad sprite reroll limit reached!")
+      break
+    end
+    
     spriteNum = math.random(1, spaces.singlePadsSprite.spriteCount)
+    
+    if self.decorCountdown < 0 then
+      -- The decors and lillypad sprites are aligned so that:
+      --   any lillypad id of the form 4n works with any decor id of the form 4n
+      --   any lillypad id of the form 4n + 1 works with any decor id of the form 4n + 1
+      --   any lillypad id of the form 4n + 2 works with any decor id of the form 4n + 2
+      --   any lillypad id of the form 4n + 3 works with any decor id of the form 4n + 3
+      directionOffset = (spriteNum - 1) % 4
+      decorNum = math.random(0, spaces.decorSprite.spriteCount / 4 - 1) * 4 + directionOffset + 1
+      
+      self.decorCountdown = math.random(1, 3)
+    end
     
     -- Checks all adjacent cells
     for direction, point in pairs(misc.adjacentPoints(col, row)) do
       if self:isInbounds(point.x, point.y) then
         space = self.spacesGrid[point.x][point.y]
         
-        if space then  -- If a space exists there
-          if space:isSingleCell() then  -- If the space is single-celled
-            if space.spriteNum == spriteNum then  -- If the sprite is equal
+        -- If any adjacent single cell spaces have the same sprite or decor
+        if space then
+          if space:isSingleCell() then
+            if space.spriteNum == spriteNum then
               
-              -- Loop from the start, randomly choosing another sprite number
+              -- Loop from the start, randomly choosing another sprite/decor
+              equalsAdjacent = true
+              break
+              
+            elseif decorNum and space.decorNum == decorNum then
               equalsAdjacent = true
               break
               
             end
+            
           end
         end
         
@@ -137,7 +168,7 @@ function grid.Grid:addCellSpace(col, row)
   end
 
   -- Creates the space and adds it to the grid
-  local newSpace = spaces.Space:new(col, row, spriteNum)
+  local newSpace = spaces.Space:new(col, row, spriteNum, decorNum)
   self.spacesGrid[col][row] = newSpace
   self.spacesList[newSpace] = true
 end

@@ -4,31 +4,27 @@ local graphics = {}
 
 graphics.scale = 4
 
-graphics.COLOR_WHITE = {255, 255, 255}
-graphics.COLOR_BLACK = {0, 0, 0}
-graphics.COLOR_LILLYPAD = {145, 206, 50}
-graphics.COLOR_LILLYPAD_SHADOW = {94, 153, 0}
-graphics.COLOR_LILLYPAD_HIGHLIGHT = {221, 221, 39}
-graphics.COLOR_LILLYPAD_SHADOW_HIGHLIGHT = {176, 176, 37}
-graphics.COLOR_WATER = {0, 255, 182}
-graphics.COLOR_WATER_SHADOW = {0, 0, 0, 76}
-
-
--- Changes the resampling mode so that pixel art is crisp when resized.
-love.graphics.setDefaultFilter("nearest", "nearest")
-
-
---- Sets love's drawing color, given a 4-number list representing the rgba value.
--- This rgba differes from love's in that it sets the color based on a 0-255 scale.
-function graphics.setColor(colorList)
-  
+--- Converts a color with 0-255 range to a color with 0-1 range.
+function graphics.convertColor(colorList)
   actualColor = {}
   for i = 1, #colorList do
     actualColor[i] = colorList[i] / 255
   end
-  
-  love.graphics.setColor(actualColor)
+  return actualColor
 end
+
+graphics.COLOR_WHITE = graphics.convertColor({255, 255, 255})
+graphics.COLOR_BLACK = graphics.convertColor({0, 0, 0})
+graphics.COLOR_LILLYPAD = graphics.convertColor({145, 206, 50})
+graphics.COLOR_LILLYPAD_SHADOW = graphics.convertColor({94, 153, 0})
+graphics.COLOR_LILLYPAD_HIGHLIGHT = graphics.convertColor({221, 221, 39})
+graphics.COLOR_LILLYPAD_SHADOW_HIGHLIGHT = graphics.convertColor({176, 176, 37})
+graphics.COLOR_WATER = graphics.convertColor({0, 255, 182})
+graphics.COLOR_WATER_SHADOW = graphics.convertColor({0, 0, 0, 76})
+
+
+-- Changes the resampling mode so that pixel art is crisp when resized.
+love.graphics.setDefaultFilter("nearest", "nearest")
 
 
 graphics.SpriteSheet = {}

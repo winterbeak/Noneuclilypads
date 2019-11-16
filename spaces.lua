@@ -15,6 +15,9 @@ spaces.singlePadsHighlightSprite = graphics.SpriteSheet:new("singlePadsHighlight
 spaces.multiPadsSprite = graphics.SpriteSheet:new("multiPads.png", 15)
 spaces.multiPadsHighlightSprite = graphics.SpriteSheet:new("multiPadsHighlighted.png", 15)
 
+spaces.decorSprite = graphics.SpriteSheet:new("decor.png", 24)
+spaces.decorShadowlessSprite = graphics.SpriteSheet:new("decorShadowless.png", 24)
+
 
 --- Draws a square, and its shadow if an offset is given.
 -- Does not change love's graphics color.
@@ -23,7 +26,7 @@ local function drawSquare(size, x, y, shadowOffsetX, shadowOffsetY)
   -- Draws shadow
   if shadowOffsetX then
     local previousR, previousG, previousB, previousA = love.graphics.getColor()
-    graphics.setColor(graphics.COLOR_WATER_SHADOW)
+    love.graphics.setColor(graphics.COLOR_WATER_SHADOW)
     
     love.graphics.rectangle("fill", x + shadowOffsetX, y + shadowOffsetY, size, size)
     
@@ -39,7 +42,7 @@ end
 spaces.Space = {}
 
 --- Constructor.  Makes a new Space at the given coordinates.
-function spaces.Space:new(col, row, spriteNum)
+function spaces.Space:new(col, row, spriteNum, decorNum)
   local newObj = {
     cells = misc.table2D(const.MAX_GRID_W),
     adjacent = {
@@ -52,7 +55,8 @@ function spaces.Space:new(col, row, spriteNum)
 
     occupiedBy = nil,
     
-    spriteNum = spriteNum or 0
+    spriteNum = spriteNum or 1,
+    decorNum = decorNum or nil
   }
   
   newObj.cells[col][row] = true
@@ -186,25 +190,37 @@ function spaces.Space:draw(gridX, gridY, scale, shadowOffsetX, shadowOffsetY, is
   if self:isSingleCell() then
     local col, row = self:findACell()
     
+    -- Changes the spritesheet depending on whether the lillypad is highlighted
     if isSelected then
       spriteSheet = spaces.singlePadsHighlightSprite
     else
       spriteSheet = spaces.singlePadsSprite
     end
     
+    -- Calculates the position to draw the top left of the sprite
     x = gridX + (cellSize * (col - 1))
     y = gridY + (cellSize * (row - 1))
     
     -- Draws the shadow
-    graphics.setColor(graphics.COLOR_WATER_SHADOW)
+    love.graphics.setColor(graphics.COLOR_WATER_SHADOW)
     spriteSheet:draw(self.spriteNum, x + shadowOffsetX, y + shadowOffsetY, scale)
     
     -- Draws the sprite itself
-    graphics.setColor(graphics.COLOR_WHITE)
+    love.graphics.setColor(graphics.COLOR_WHITE)
     spriteSheet:draw(self.spriteNum, x, y, scale)
     
+    -- Draws the sprite's decor
+    -- If the shadow offset is a pixel or greater, draw the shadowed decor.
+    if self.decorNum and shadowOffsetX >= scale then
+      spaces.decorSprite:draw(self.decorNum, x, y, scale)
+      
+    -- Otherwise, draw the shadowless decor.
+    elseif self.decorNum then
+      spaces.decorShadowlessSprite:draw(self.decorNum, x, y, scale)
+    end
+    
   -- Draws a multicell space
-else
+  else
     local lillypadColor
     local lillypadShadowColor
     local spriteId
@@ -214,6 +230,7 @@ else
     local down
     local pixel = scale
     
+    -- Changes the draw colors and spritesheets, depending on whether the lillypad is highlighted
     if isSelected then
       spriteSheet = spaces.multiPadsHighlightSprite
       lillypadColor = graphics.COLOR_LILLYPAD_HIGHLIGHT
@@ -224,14 +241,17 @@ else
       lillypadShadowColor = graphics.COLOR_LILLYPAD_SHADOW
     end
     
+    -- Loop through every cell in this space
     for colNum, col in pairs(self.cells) do
       for rowNum, _ in pairs(col) do
         
+        -- Determines if there is a cell in each direction
         left = self:isCell(colNum - 1, rowNum)
         up = self:isCell(colNum, rowNum - 1)
         right = self:isCell(colNum + 1, rowNum)
         down = self:isCell(colNum, rowNum + 1)
         
+        -- Calculates the position to draw the top left of the sprite
         x = gridX + (cellSize * (colNum - 1))
         y = gridY + (cellSize * (rowNum - 1))
         
@@ -240,11 +260,11 @@ else
         spriteNum = misc.toBits({left, up, right, down})
         
         -- Draws shadow
-        graphics.setColor(graphics.COLOR_WATER_SHADOW)
+        love.graphics.setColor(graphics.COLOR_WATER_SHADOW)
         spriteSheet:draw(spriteNum, x + shadowOffsetX, y + shadowOffsetY, scale)
         
         -- Draws the sprite
-        graphics.setColor(graphics.COLOR_WHITE)
+        love.graphics.setColor(graphics.COLOR_WHITE)
         spriteSheet:draw(spriteNum, x, y, scale)
 
         -- Draws the corner edge cases, pixel by pixel
@@ -252,9 +272,10 @@ else
         -- a million different parameters
         
         -- scale in all below cases represents one pixel
+        
         shadowOffset = scale*2
         
-        graphics.setColor(graphics.COLOR_BLACK)
+        love.graphics.setColor(graphics.COLOR_BLACK)
 
         -- Top left corner
         if left and up then
@@ -269,7 +290,7 @@ else
             drawSquare(pixel, x, y + pixel)
             drawSquare(pixel, x + pixel, y + pixel)
             
-            graphics.setColor(lillypadColor)
+            love.graphics.setColor(lillypadColor)
             drawSquare(pixel, x, y + pixel*2)
           end
         
@@ -278,12 +299,12 @@ else
             drawSquare(pixel, x + pixel, y)
             drawSquare(pixel, x + pixel, y + pixel)
             
-            graphics.setColor(lillypadColor)
+            love.graphics.setColor(lillypadColor)
             drawSquare(pixel, x + pixel*2, y)
           end
         end
         
-        graphics.setColor(graphics.COLOR_BLACK)
+        love.graphics.setColor(graphics.COLOR_BLACK)
         
         -- Top right corner
         if right and up then
@@ -292,7 +313,7 @@ else
             drawSquare(pixel, x + cellSize - pixel, y)
             drawSquare(pixel, x + cellSize - pixel*2, y)
             
-            graphics.setColor(lillypadColor)
+            love.graphics.setColor(lillypadColor)
             drawSquare(pixel, x + cellSize - pixel*3, y)
             drawSquare(pixel, x + cellSize - pixel*2, y + pixel)
           end
@@ -302,7 +323,7 @@ else
             drawSquare(pixel, x + cellSize - pixel, y + pixel)
             drawSquare(pixel, x + cellSize - pixel*2, y + pixel)
             
-            graphics.setColor(lillypadColor)
+            love.graphics.setColor(lillypadColor)
             drawSquare(pixel, x + cellSize - pixel, y + pixel*2)
           end
         
@@ -311,12 +332,12 @@ else
             drawSquare(pixel, x + cellSize - pixel*2, y, shadowOffsetX, shadowOffsetY)
             drawSquare(pixel, x + cellSize - pixel*2, y + pixel, shadowOffsetX, shadowOffsetY)
             
-            graphics.setColor(lillypadShadowColor)
+            love.graphics.setColor(lillypadShadowColor)
             drawSquare(pixel, x + cellSize - pixel*3, y)
           end
         end
         
-        graphics.setColor(graphics.COLOR_BLACK)
+        love.graphics.setColor(graphics.COLOR_BLACK)
         
         -- Bottom right corner
         if right and down then
@@ -325,7 +346,7 @@ else
             drawSquare(pixel, x + cellSize - pixel, y + cellSize - pixel)
             drawSquare(pixel, x + cellSize - pixel, y + cellSize - pixel*2)
             
-            graphics.setColor(lillypadShadowColor)
+            love.graphics.setColor(lillypadShadowColor)
             drawSquare(pixel, x + cellSize - scale, y + cellSize - scale*3)
             drawSquare(pixel, x + cellSize - scale*2, y + cellSize - scale*3)
             drawSquare(pixel, x + cellSize - scale*2, y + cellSize - scale*2)
@@ -339,10 +360,10 @@ else
             drawSquare(pixel, x + cellSize - scale*2, y + cellSize - scale*2, shadowOffsetX, shadowOffsetY)
             drawSquare(pixel, x + cellSize - scale, y + cellSize - scale*2)
             
-            graphics.setColor(lillypadColor)
+            love.graphics.setColor(lillypadColor)
             drawSquare(pixel, x + cellSize - scale, y + cellSize - scale*4)
             
-            graphics.setColor(lillypadShadowColor)
+            love.graphics.setColor(lillypadShadowColor)
             drawSquare(pixel, x + cellSize - scale, y + cellSize - scale*3)
           end
         
@@ -351,15 +372,15 @@ else
             drawSquare(pixel, x + cellSize - scale*2, y + cellSize - scale*2, shadowOffsetX, shadowOffsetY)
             drawSquare(pixel, x + cellSize - scale*2, y + cellSize - scale)
             
-            graphics.setColor(lillypadColor)
+            love.graphics.setColor(lillypadColor)
             drawSquare(pixel, x + cellSize - scale*4, y + cellSize - scale)
             
-            graphics.setColor(lillypadShadowColor)
+            love.graphics.setColor(lillypadShadowColor)
             drawSquare(pixel, x + cellSize - scale*3, y + cellSize - scale)
           end
         end
         
-        graphics.setColor(graphics.COLOR_BLACK)
+        love.graphics.setColor(graphics.COLOR_BLACK)
         
         -- Bottom left corner
         if left and down then
@@ -368,7 +389,7 @@ else
             drawSquare(pixel, x, y + cellSize - pixel)
             drawSquare(pixel, x + pixel, y + cellSize - pixel)
             
-            graphics.setColor(lillypadShadowColor)
+            love.graphics.setColor(lillypadShadowColor)
             drawSquare(pixel, x, y + cellSize - pixel*3)
             drawSquare(pixel, x + pixel, y + cellSize - pixel*2)
             
@@ -379,7 +400,7 @@ else
             drawSquare(pixel, x, y + cellSize - pixel*2, shadowOffsetX, shadowOffsetY)
             drawSquare(pixel, x + pixel, y + cellSize - pixel*2, shadowOffsetX, shadowOffsetY)
             
-            graphics.setColor(lillypadShadowColor)
+            love.graphics.setColor(lillypadShadowColor)
             drawSquare(pixel, x, y + cellSize - pixel*3)
           end
         
@@ -388,7 +409,7 @@ else
             drawSquare(pixel, x + pixel, y + cellSize - pixel*2)
             drawSquare(pixel, x + pixel, y + cellSize - pixel)
             
-            graphics.setColor(lillypadColor)
+            love.graphics.setColor(lillypadColor)
             drawSquare(pixel, x + pixel*2, y + cellSize - pixel)
           end
         end

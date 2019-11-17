@@ -101,7 +101,7 @@ function love.load()
   level:refreshAllAdjacent()
   
   
-  player = bodies.WarpBody:new(level.spacesGrid[4][4])
+  player = bodies.Player:new(level.spacesGrid[4][4])
 
   CHOOSE_DIRECTION = 1
   CHOOSE_SPACE = 2
@@ -116,27 +116,52 @@ function love.load()
   mouseDownPreviousFrame = false
   
   mouseSpace = nil
+  
+  -- For tracking the fps
+  totalTime = 0
+  totalFrames = 0
 end
 
 
 --- Runs every frame.
-function love.update()
+function love.update(dt)
+  totalTime = totalTime + dt
+  totalFrames = totalFrames + 1
 
   updateMouse()
   mouseSpace = spaceAt(level, love.mouse.getX(), love.mouse.getY())
+  
+  if player.body.moving then
+    player.animation:update()
+  end
+  
+  if player.animation.isDone then
+    lockMovement = false
+    
+    player.jumpAnim:reset()
+    player.animation = player.idleAnim
+    player.body.moving = false
+  end
 
-  if mouseReleased then
+  if not lockMovement and mouseReleased then
 
-    for direction, spaceList in pairs(player.space.adjacent) do
+    for direction, spaceList in pairs(player.body.space.adjacent) do
       for space, _ in pairs(spaceList) do
         if (space == mouseSpace) then
-          player:moveTo(space)
+          player:moveTo(space, direction)
+          lockMovement = true
           break
         end
       end
+      
+      if lockMovement then
+        break
+      end
+      
     end
     
   end
+
 end
 
 function drawDebugCell(r, g, b, col, row)
@@ -157,12 +182,12 @@ function love.draw()
   for space, _ in pairs(level.spacesList) do
     highlighted = false
     
-    if space.occupiedBy == player then
+    if space.occupiedBy == player.body then
       highlighted = true
       
     else
       for index, adjacentSpace in pairs(space.adjacentList) do
-        if adjacentSpace.occupiedBy == player then
+        if adjacentSpace.occupiedBy == player.body then
           highlighted = true
           break
         end
@@ -189,10 +214,11 @@ function love.draw()
     
   end
   
-  for colNum, col in pairs(player.space.cells) do
-    for rowNum, _ in pairs(col) do
-      drawDebugCell(255, 0, 0, colNum, rowNum)
-    end
-  end
-
+  player:draw(gridXOffset, gridYOffset, pixel, tileSize)
+  
+  -- FPS counter
+  love.graphics.setColor(graphics.COLOR_BLACK)
+  love.graphics.print("" .. (totalFrames / totalTime), 10, 10)
+  love.graphics.setColor(graphics.COLOR_WHITE)
+  
 end

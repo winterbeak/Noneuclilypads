@@ -99,7 +99,7 @@ function love.load()
   level = levelgen.testingLevel()
   level:addEnemy(bodies.Rat:new(level.spacesGrid[5][4]))
   level:addEnemy(bodies.Snake:newRandom(level.spacesGrid[7][7]))
-  level:addEnemy(bodies.Snail:new(level.spacesGrid[7][1]))
+  level:addEnemy(bodies.Slug:new(level.spacesGrid[7][1]))
   
   player = bodies.Player:new(level.spacesGrid[1][1])
   
@@ -136,16 +136,12 @@ function love.update(dt)
   mouseSpace = spaceAt(level, love.mouse.getX(), love.mouse.getY())
   
   -- Updates player animation
-  if player.body.moving then
-    player.animation:update()
-  end
+  lockMovement = false -- change later
+  player:updateAnimation()
   
-  if player.animation.isDone then
-    lockMovement = false
-    
-    player.jumpAnim:reset()
-    player.animation = player.idleAnim
-    player.body.moving = false
+  -- Updates enemy animations
+  for enemy, _ in pairs(level.enemyList) do
+    enemy:updateAnimation()
   end
   
   -- What happens when the mouse is clicked
@@ -259,7 +255,7 @@ function love.draw()
   
   player:draw(gridXOffset + playerXOffset, gridYOffset + playerYOffset, pixel, tileSize)
   
-  level:drawEnemies(gridXOffset, gridYOffset, scale, tileSize)
+  level:drawEnemies(gridXOffset, gridYOffset, pixel, tileSize)
   
   
   -- FPS counter

@@ -7,9 +7,14 @@ local bodies = {}
 
 local SNAKE_LENGTH = 5
 
-bodies.jumpOffsets = {0, 13, 22, 24, 24, 24}
+bodies.playerJumpOffsets = {0, 13, 22, 24, 24, 24}
 bodies.playerIdleSpriteSheet = graphics.SpriteSheet:new("frogIdle.png", 1)
 bodies.playerJumpSpriteSheet = graphics.SpriteSheet:new("frogJump.png", 6)
+
+bodies.ratJumpOffsets = {0, 0, 0, 7, 25, 29, 29, 29}
+bodies.ratIdle1SpriteSheet = graphics.SpriteSheet:new("ratIdle1.png", 1)
+bodies.ratIdle2SpriteSheet = graphics.SpriteSheet:new("ratIdle2.png", 12)
+bodies.ratJumpSpriteSheet = graphics.SpriteSheet:new("ratJump.png", 8)
 
 bodies.WarpBody = {}
 
@@ -90,7 +95,7 @@ function bodies.Player:draw(gridXOffset, gridYOffset, scale, tileSize)
   
   -- Sets the amount of forwards shift of the player sprite during the moving animation
   if self.body.moving then
-    previousForwardsShift = bodies.jumpOffsets[self.animation.frame]
+    previousForwardsShift = bodies.playerJumpOffsets[self.animation.frame]
     forwardsShift = -tileSize / scale + previousForwardsShift
   end
   
@@ -127,17 +132,39 @@ function bodies.Player:draw(gridXOffset, gridYOffset, scale, tileSize)
 end
 
 
+--- Updates the player's animation.  Should be called every frame.
+function bodies.Player:updateAnimation()
+  if self.body.moving then
+    self.animation:update()
+  end
+  
+  if self.animation.isDone then
+    self.jumpAnim:reset()
+    self.animation = self.idleAnim
+    self.body.moving = false
+  end
+end
+
+
 bodies.Rat = {}
 
 --- Constructor.  Makes a rat enemy.
 -- This enemy always waits a turn, then moves closer to the player, repeatedly.
 function bodies.Rat:new(startSpace)
   local newObj = {
+    idleAnim1 = graphics.Animation:new(bodies.ratIdle1SpriteSheet),
+    idleAnim2 = graphics.Animation:new(bodies.ratIdle2SpriteSheet),
+    jumpAnim = graphics.Animation:new(bodies.ratJumpSpriteSheet),
+    
     moveTimer = 0,
     animation = nil,
     
     body = bodies.WarpBody:new(startSpace),
   }
+  
+  newObj.idleAnim2:setFrameLength(6)
+  newObj.jumpAnim:setFrameLength(3)
+  newObj.animation = newObj.idleAnim1
   
   newObj.body.flyCount = 3
   
@@ -153,6 +180,7 @@ function bodies.Rat:move(player)
   
   if closestSpace then
     self.body:moveTo(closestSpace, self.body.space:directionOf(closestSpace))
+    self.animation = self.jumpAnim
     
   -- If no valid space was found then
   else
@@ -166,7 +194,12 @@ end
 -- Rats always wait one turn, then move one space closer to the player.
 function bodies.Rat:takeTurn(level, player)
   self.moveTimer = self.moveTimer + 1
-  if self.moveTimer == 2 then
+  
+  if self.moveTimer == 1 then
+    self.idleAnim2:reset()
+    self.animation = self.idleAnim2
+
+  elseif self.moveTimer == 2 then
     
     -- If the rat is beside the player, hurt them
     if self.body.space.distanceFromPlayer == 1 then
@@ -183,17 +216,78 @@ end
 
 --- Draws the rat.
 function bodies.Rat:draw(gridXOffset, gridYOffset, scale, tileSize)
+  
+  local rotation = 0
+  local forwardsShift
+  local previousForwardsShift
+  
+  -- Rotates the sprite based on what direction the rat is facing
+  if self.body.moveDirection == "up" then
+    rotation = math.pi / 2
+  elseif self.body.moveDirection == "right" then
+    rotation = math.pi
+  elseif self.body.moveDirection == "down" then
+    rotation = math.pi / 2 * 3
+  end
+  
+  -- Sets the amount of forwards shift of the rat sprite during the moving animation
+  if self.body.moving then
+    previousForwardsShift = bodies.ratJumpOffsets[self.animation.frame]
+    forwardsShift = -tileSize / scale + previousForwardsShift
+  end
+  
+  -- Draws the body on its current space
   for colNum, col in pairs(self.body.space.cells) do
     for rowNum, _ in pairs(col) do
       
       x = gridXOffset + ((colNum - 1) * tileSize)
       y = gridYOffset + ((rowNum - 1) * tileSize)
-      
-      love.graphics.rectangle("fill", x, y, tileSize, tileSize)
-      love.graphics.setColor(graphics.COLOR_BLACK)
-      love.graphics.print("" .. self.body.flyCount, x, y)
-      love.graphics.setColor(graphics.COLOR_WHITE)
+
+      if self.body.moving then
+        self.animation:drawShifted(x, y, forwardsShift, 0, scale, rotation)
+      else
+        self.animation:draw(x, y, scale, rotation)
+      end
+
     end
+  end
+
+  -- Draws the body on the previous space
+  if self.body.moving then
+    for colNum, col in pairs(self.body.previousSpace.cells) do
+      for rowNum, _ in pairs(col) do
+        
+        x = gridXOffset + ((colNum - 1) * tileSize)
+        y = gridYOffset + ((rowNum - 1) * tileSize)
+        
+        self.animation:drawShifted(x, y, previousForwardsShift, 0, scale, rotation)
+        
+      end
+    end
+  end
+
+end
+
+
+--- Updates the rat's animation.  Should be called every frame.
+function bodies.Rat:updateAnimation()
+  -- Jump animation
+  if self.body.moving then
+    self.animation:update()
+    
+  -- Second idle animation
+  elseif self.moveTimer == 1 then
+    self.animation:update()
+    
+    if self.animation.isDone then
+      self.animation:reset()
+    end
+  end
+  
+  if self.animation.isDone then
+    self.jumpAnim:reset()
+    self.animation = self.idleAnim1
+    self.body.moving = false
   end
 end
 
@@ -391,13 +485,19 @@ function bodies.Snake:draw(gridXOffset, gridYOffset, scale, tileSize)
 end
 
 
-bodies.Snail = {}
+--- Updates the snake's animation.  Should be called every frame.
+function bodies.Snake:updateAnimation()
+  
+end
 
---- Constructor.  Makes a snail enemy.
--- The snail is similar to the Rat in that it waits a turn, then moves closer to the player.
--- However, the snail will add slime to every space it moves off of.  After three moves,
--- instead of moving a fourth time, the snail will pause to merge all the slimed spaces.
-function bodies.Snail:new(startSpace)
+
+bodies.Slug = {}
+
+--- Constructor.  Makes a Slug enemy.
+-- The Slug is similar to the Rat in that it waits a turn, then moves closer to the player.
+-- However, the Slug will add slime to every space it moves off of.  After three moves,
+-- instead of moving a fourth time, the Slug will pause to merge all the slimed spaces.
+function bodies.Slug:new(startSpace)
   local newObj = {
     moveTimer = 0,
     animation = nil,
@@ -413,9 +513,9 @@ function bodies.Snail:new(startSpace)
 end
 
 
---- Makes the snail move.
--- Snails always move one space closer to the player.
-function bodies.Snail:move(player)
+--- Makes the slug move.
+-- Slugs always move one space closer to the player.
+function bodies.Slug:move(player)
   local previousSpace = self.body.space
   local closestSpace = self.body.space:closestAdjacent(player)
   
@@ -431,9 +531,9 @@ function bodies.Snail:move(player)
 end
 
 
---- Merges all of the snail's slimed spaces.
+--- Merges all of the slug's slimed spaces.
 -- If a space is occupied, it will NOT be merged.
-function bodies.Snail:mergeSlimed(level)
+function bodies.Slug:mergeSlimed(level)
   
   -- Removes any spaces that are occupied
   for i = 1, #self.slimedSpaces do
@@ -451,12 +551,12 @@ function bodies.Snail:mergeSlimed(level)
 end
 
 
---- Makes the snail take a turn.
--- Smails will wait a turn, the move closer to the player.
--- The snail adds slime to every space it moves off of.
--- After three moves, instead of moving a fourth time, the snail will pause
+--- Makes the slug take a turn.
+-- Slugs will wait a turn, then move closer to the player.
+-- The slug adds slime to every space it moves off of.
+-- After three moves, instead of moving a fourth time, the slug will pause
 -- to merge all the slimed spaces.
-function bodies.Snail:takeTurn(level, player)
+function bodies.Slug:takeTurn(level, player)
   self.moveTimer = self.moveTimer + 1
   
   -- On the fourth move, merge all slimed spaces.
@@ -479,8 +579,8 @@ function bodies.Snail:takeTurn(level, player)
 end
   
 
---- Draws the snake.
-function bodies.Snail:draw(gridXOffset, gridYOffset, scale, tileSize)
+--- Draws the slug.
+function bodies.Slug:draw(gridXOffset, gridYOffset, scale, tileSize)
   love.graphics.setColor(100, 0, 100)
   
   -- Draws the slime
@@ -513,6 +613,11 @@ function bodies.Snail:draw(gridXOffset, gridYOffset, scale, tileSize)
       
     end
   end
+end
+
+--- Updates the slug's animation.  Should be called every frame.
+function bodies.Slug:updateAnimation()
+  
 end
 
 

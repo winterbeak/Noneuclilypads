@@ -65,7 +65,7 @@ function graphics.SpriteSheet:draw(spriteNum, x, y, scale, rotation)
   
   x = x + (centerX * scale)
   y = y + (centerY * scale)
-
+  
   love.graphics.draw(self.image, self.quads[spriteNum], x, y, rotation, scale, scale, centerX, centerY)
 
 end
@@ -96,8 +96,7 @@ function graphics.SpriteSheet:drawShifted(spriteNum, x, y, forwardsShift, sidewa
   
   local newX
   local newY
-  local forwardsOffset
-  local sidewaysOffset
+
   local quadX
   local quadY
   local quadWidth = self.width - math.abs(forwardsShift)
@@ -108,21 +107,17 @@ function graphics.SpriteSheet:drawShifted(spriteNum, x, y, forwardsShift, sidewa
   
   rotation = rotation or 0
   
-  newX = x + (centerX * scale)
-  newY = y + (centerY * scale)
-  
-  if forwardsShift > 0 then
-    forwardsOffset = -self.width + forwardsShift
+  -- Centers the sprite so that it can be rotated from its center.
+  if rotation == 0 or rotation == math.pi then
+    newX = x + (centerX * scale)
+    newY = y + (centerY * scale)
+    
+  -- If the sprite is not square, then a 90 or 270 degree rotation will change
+  -- the "width" and "height".  This fixes that.
   else
-    forwardsOffset = self.width + forwardsShift
+    newX = x + (centerY * scale)
+    newY = y + (centerX * scale)
   end
-  
-  if sidewaysShift > 0 then
-    sidewaysOffset = self.singleHeight - forwardsShift
-  else
-    sidewaysOffset = -self.singleHeight - forwardsShift
-  end
-
 
   -- Shifting backwards means the right side of the sprite gets cropped
   if forwardsShift < 0 then
@@ -166,7 +161,7 @@ function graphics.SpriteSheet:drawShifted(spriteNum, x, y, forwardsShift, sidewa
   quadY = quadY + (self.singleHeight * (spriteNum - 1))
 
   local quad = love.graphics.newQuad(quadX, quadY, quadWidth, quadHeight, self.width, self.fullHeight)
-
+  
   love.graphics.draw(self.image, quad, newX, newY, rotation, scale, scale, centerX, centerY)
 
 end

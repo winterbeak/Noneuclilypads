@@ -5,11 +5,23 @@ local grid = require("grid")
 local bodies = require("bodies")
 local spaces = require("spaces")
 local graphics = require("graphics")
+local levelgen = require("levelgen")
 
 local gridXOffset = 150
 local gridYOffset = 50
-local pixel = 4
+local pixel = 3
 local tileSize = (pixel * spaces.singlePadsSprite.width)
+local showFPS = false
+
+
+--- Changes a few settings for gif recording.
+function gifMode()
+  love.window.setMode(450, 300)
+  pixel = 3
+  tileSize = pixel * spaces.singlePadsSprite.width
+  gridXOffset = 45
+  gridYOffset = 39
+end
 
 
 --- Returns the x of the left side of a column.
@@ -48,6 +60,13 @@ function spaceAt(levelGrid, x, y)
 end
 
 
+function drawDebugCell(r, g, b, col, row)
+  love.graphics.setColor(r, g, b)
+  love.graphics.rectangle("fill", xOf(col), yOf(row), tileSize, tileSize)
+  love.graphics.setColor(255, 255, 255)
+end
+
+
 function updateMouse()
   if love.mouse.isDown(1) then
     if not mouseHeld then
@@ -73,43 +92,22 @@ end
 --- Runs when the game is started.
 function love.load()
   
-  -- Sets the random seed
+  -- gifMode()
+  
   math.randomseed(os.time())
-
-  -- Prevents the holding of a key
-  love.keyboard.setKeyRepeat(false)
   
-  -- Generates level
-  level = grid.Grid:new(5, 5)
-
-  local pointList = {
-    {x=2, y=1},
-    {x=3, y=1},
-    {x=3, y=2},
-    {x=3, y=3},
-    {x=2, y=3},
-    {x=4, y=3},
-    {x=3, y=4}
-  }
-
-  level:addSpace(pointList)
-  level:fillGapsWithSpaces()
+  level = levelgen.testingLevel()
+  level:addEnemy(bodies.Rat:new(level.spacesGrid[5][4]))
+  level:addEnemy(bodies.Snake:newRandom(level.spacesGrid[7][7]))
+  level:addEnemy(bodies.Snail:new(level.spacesGrid[7][1]))
   
-  level:merge(3, 5, 4, 5)
-  level:deleteCell(5, 5)
-
-  level:refreshAllAdjacent()
+  player = bodies.Player:new(level.spacesGrid[1][1])
   
-  
-  player = bodies.Player:new(level.spacesGrid[4][4])
+  level:updateDistances(player.body.space)
 
-  CHOOSE_DIRECTION = 1
-  CHOOSE_SPACE = 2
-  MOVEMENT = 3
-
-  state = CHOOSE_DIRECTION
   lockMovement = false
   
+  -- Keeps track of mouse events
   mouseClicked = false
   mouseHeld = false
   mouseReleased = false
@@ -117,20 +115,27 @@ function love.load()
   
   mouseSpace = nil
   
-  -- For tracking the fps
+  -- Tracks fps
   totalTime = 0
   totalFrames = 0
+
 end
 
 
 --- Runs every frame.
 function love.update(dt)
-  totalTime = totalTime + dt
-  totalFrames = totalFrames + 1
-
+  
+  -- Draws fps
+  if showFPS then
+    totalTime = totalTime + dt
+    totalFrames = totalFrames + 1
+  end
+  
+  -- Updates mouse events
   updateMouse()
   mouseSpace = spaceAt(level, love.mouse.getX(), love.mouse.getY())
   
+  -- Updates player animation
   if player.body.moving then
     player.animation:update()
   end
@@ -142,21 +147,50 @@ function love.update(dt)
     player.animation = player.idleAnim
     player.body.moving = false
   end
-
+  
+  -- What happens when the mouse is clicked
   if not lockMovement and mouseReleased then
-
-    for direction, spaceList in pairs(player.body.space.adjacent) do
-      for space, _ in pairs(spaceList) do
-        if (space == mouseSpace) then
-          player:moveTo(space, direction)
-          lockMovement = true
-          break
+    
+    local validMove
+    local eatFlies
+    
+    if player.body.space.adjacentList[mouseSpace] then
+      if mouseSpace:isOccupied() then
+        if mouseSpace.occupiedBy.flyCount > 0 then
+          validMove = true
+          eatFlies = true
+        else
+          validMove = false
+          eatFlies = false
         end
+      else
+        validMove = true
+        eatFlies = false
+      end
+    end
+    
+    if validMove then
+      
+      -- Move the player
+      if eatFlies then
+        mouseSpace.occupiedBy.flyCount = mouseSpace.occupiedBy.flyCount - 1
+        player.energy = player.energy + 1
+        
+      else
+        lockMovement = true
+        
+        for direction, spacesList in pairs(player.body.space.adjacent) do
+          if spacesList[mouseSpace] then
+            player:moveTo(mouseSpace, direction)
+            level:updateDistances(player.body.space)
+            break
+          end
+        end
+
       end
       
-      if lockMovement then
-        break
-      end
+      -- Have all the enemies take their turn
+      level:doEnemyTurns(player)
       
     end
     
@@ -164,20 +198,16 @@ function love.update(dt)
 
 end
 
-function drawDebugCell(r, g, b, col, row)
-  love.graphics.setColor(r, g, b)
-  love.graphics.rectangle("fill", xOf(col), yOf(row), tileSize, tileSize)
-  love.graphics.setColor(255, 255, 255)
-end
-
 
 --- Runs every frame.
 function love.draw()
   local highlighted
+  local playerXOffset = 0
+  local playerYOffset = 0
   
   love.graphics.setBackgroundColor(graphics.COLOR_WATER)
   
-  level:drawDebug(gridXOffset, gridYOffset, tileSize)
+  -- level:drawDebug(gridXOffset, gridYOffset, tileSize)
   
   for space, _ in pairs(level.spacesList) do
     highlighted = false
@@ -186,7 +216,7 @@ function love.draw()
       highlighted = true
       
     else
-      for index, adjacentSpace in pairs(space.adjacentList) do
+      for adjacentSpace, _ in pairs(space.adjacentList) do
         if adjacentSpace.occupiedBy == player.body then
           highlighted = true
           break
@@ -202,9 +232,20 @@ function love.draw()
       if mouseHeld then
         space:draw(gridXOffset + pixel*2, gridYOffset + pixel*2, pixel, 0, 0, highlighted)
         
+        if space == player.body.space then
+          playerXOffset = pixel*2
+          playerYOffset = pixel*2
+        end
+        
       -- Otherwise, compress it the normal amount
       else
         space:draw(gridXOffset + pixel, gridYOffset + pixel, pixel, pixel, pixel, highlighted)
+        
+        if space == player.body.space then
+          playerXOffset = pixel
+          playerYOffset = pixel
+        end
+        
       end
       
     -- Otherwise, draws the space normally
@@ -214,11 +255,18 @@ function love.draw()
     
   end
   
-  player:draw(gridXOffset, gridYOffset, pixel, tileSize)
+  level:drawDistances(gridXOffset, gridYOffset, tileSize)
+  
+  player:draw(gridXOffset + playerXOffset, gridYOffset + playerYOffset, pixel, tileSize)
+  
+  level:drawEnemies(gridXOffset, gridYOffset, scale, tileSize)
+  
   
   -- FPS counter
-  love.graphics.setColor(graphics.COLOR_BLACK)
-  love.graphics.print("" .. (totalFrames / totalTime), 10, 10)
-  love.graphics.setColor(graphics.COLOR_WHITE)
+  if showFPS then
+    love.graphics.setColor(graphics.COLOR_BLACK)
+    love.graphics.print("" .. (totalFrames / totalTime), 10, 10)
+    love.graphics.setColor(graphics.COLOR_WHITE)
+  end
   
 end

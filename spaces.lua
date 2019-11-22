@@ -54,6 +54,7 @@ function spaces.Space:new(col, row, spriteNum, decorNum)
     adjacentList = {},
 
     occupiedBy = nil,
+    distanceFromPlayer = 0,
     
     spriteNum = spriteNum or 1,
     decorNum = decorNum or nil
@@ -126,7 +127,10 @@ function spaces.Space:isSingleCell()
       return false
     end
     
-    foundCell = foundCellInCol
+    -- This messed me up for way longer than it should have
+    -- Previously it was just foundCell = foundCellInCol, which sometimes
+    -- sets foundCell to false even after finding a cell elsewhere
+    foundCell = foundCell or foundCellInCol
 
   end
   
@@ -174,6 +178,69 @@ function spaces.Space:isCell(col, row)
   
   return false
   
+end
+
+
+
+--- Returns whether the space is occupied by something or not.
+function spaces.Space:isOccupied()
+  if self.occupiedBy then
+    return true
+  end
+  
+  return false
+end
+
+
+--- Returns the closest space to the player, that is adjacent to this one.
+-- Returns nil if there are no spaces adjacent to this one.
+function spaces.Space:closestAdjacent(player)
+  local foundSpace = false
+  local closestSpace
+  
+  for space, _ in pairs(self.adjacentList) do
+    
+    -- Ignore all already occupied spaces
+    if not space:isOccupied() then
+      
+      -- Always prioritize the player's previous space
+      if space == player.body.previousSpace then
+        foundSpace = true
+        closestSpace = space
+        
+      -- If this isn't the first space, compare it with the previous closest
+      elseif foundSpace then
+        if space.distanceFromPlayer < closestSpace.distanceFromPlayer then
+          closestSpace = space
+        end
+      
+      -- If this is the first space, it must be the closest
+      else
+        foundSpace = true
+        closestSpace = space
+      end
+      
+    end
+    
+  end
+  
+  return closestSpace
+
+end
+
+
+--- Returns the direction of a space adjacent to this one.
+-- If the space is not adjacent, nil is returned.
+-- If the space is touching more than one directions, then the priority order
+-- is left, up, right, down.
+function spaces.Space:directionOf(space)
+  for direction, spaceList in pairs(self.adjacent) do
+    if spaceList[space] then
+      return direction
+    end
+  end
+  
+  return nil
 end
 
 
@@ -260,8 +327,28 @@ function spaces.Space:draw(gridX, gridY, scale, shadowOffsetX, shadowOffsetY, is
         spriteNum = misc.toBits({left, up, right, down})
         
         -- Draws shadow
-        love.graphics.setColor(graphics.COLOR_WATER_SHADOW)
-        spriteSheet:draw(spriteNum, x + shadowOffsetX, y + shadowOffsetY, scale)
+        if not self:isCell(colNum + 1, rowNum + 1) then
+          love.graphics.setColor(graphics.COLOR_WATER_SHADOW)
+          
+          local shadowX = x + shadowOffsetX
+          local shadowY = y + shadowOffsetY
+          local shadowOffsetXPixels = shadowOffsetX / pixel
+          local shadowOffsetYPixels = shadowOffsetY / pixel
+          local upCrop = 0
+          local leftCrop = 0
+          
+          -- If there's a lillypad below, only draw the right side of the shadow
+          if down then
+            leftCrop = spaces.singlePadsSprite.width - shadowOffsetXPixels - 2
+          end
+          
+          -- If there's a lillypad to the right, only draw the bottom of the shadow
+          if right then
+            upCrop = spaces.singlePadsSprite.singleHeight - shadowOffsetYPixels - 2
+          end
+          
+          spriteSheet:drawPartial(spriteNum, shadowX, shadowY, leftCrop, upCrop, 0, 0, scale)
+        end
         
         -- Draws the sprite
         love.graphics.setColor(graphics.COLOR_WHITE)
@@ -421,5 +508,18 @@ function spaces.Space:draw(gridX, gridY, scale, shadowOffsetX, shadowOffsetY, is
   end
   
 end
+
+
+--- Prints the coordinates of all the cells this space covers.
+function spaces.Space:printCells()
+  for colNum, col in pairs(self.cells) do
+    for rowNum, _ in pairs(col) do
+      print(colNum, rowNum)
+    end
+  end
+  
+  print()
+end
+
 
 return spaces

@@ -21,7 +21,9 @@ function grid.Grid:new(width, height)
     spacesList = {},  -- Set of all unique spaces in the level
     spacesGrid = misc.table2D(width),
     
-    decorCountdown = math.random(1, 3)  -- Countdown towards the next space with a decor
+    decorCountdown = math.random(1, 3),  -- Countdown towards the next space with a decor
+    
+    enemyList = {}
   }
 
   self.__index = self
@@ -76,7 +78,7 @@ function grid.Grid:refreshAdjacent(space)
           if adjacentSpace then
             if adjacentSpace ~= space then
               space.adjacent[direction][adjacentSpace] = true
-              table.insert(space.adjacentList, adjacentSpace)
+              space.adjacentList[adjacentSpace] = true
             end
           end
           
@@ -117,6 +119,8 @@ function grid.Grid:addCellSpace(col, row)
   self.decorCountdown = self.decorCountdown - 1
   
   while equalsAdjacent do
+    decorNum = nil
+    
     equalsAdjacent = false
     
     rerolls = rerolls + 1
@@ -135,8 +139,8 @@ function grid.Grid:addCellSpace(col, row)
       --   any lillypad id of the form 4n + 3 works with any decor id of the form 4n + 3
       directionOffset = (spriteNum - 1) % 4
       decorNum = math.random(0, spaces.decorSprite.spriteCount / 4 - 1) * 4 + directionOffset + 1
-      
-      self.decorCountdown = math.random(1, 3)
+
+      self.decorCountdown = math.random(1, 2)
     end
     
     -- Checks all adjacent cells
@@ -218,10 +222,14 @@ function grid.Grid:fillGapsWithSpaces()
   end
 end
 
---- Merges two Spaces together, given their coordinates.
-function grid.Grid:merge(col1, row1, col2, row2)
-  local space1 = self.spacesGrid[col1][row1]
-  local space2 = self.spacesGrid[col2][row2]
+
+--- Merges two spaces together.
+-- The spaces must be part of this grid.
+-- If the spaces are not adjacent, then nothing will happen
+-- (though the function will do a bunch of calculations for no reason)
+-- If the spaces are the same space, then an error will be raised.
+-- space2 will be deleted afterwards, and space1 will be the merged result.
+function grid.Grid:merge(space1, space2)
   
   -- Throw an error if you try to merge a space with itself
   if space1 == space2 then
@@ -240,6 +248,55 @@ function grid.Grid:merge(col1, row1, col2, row2)
   
   -- Remove space2 from the list of spaces
   self.spacesList[space2] = nil
+  
+  self:attemptSplit(space1)
+end
+
+
+--- Merges multiple spaces together.
+-- spaceList must be a list where each index is a consecutive number, starting from 1.
+-- The spaces must be part of this grid.
+-- Spaces will only be merged with other adjacent spaces.  If there is a split somewhere,
+-- then the space will be split into multiple spaces.
+-- Duplicate spaces do not have an effect on the final result and are functionally ignored.
+-- All the spaces but the first will be deleted from existance.  The first space will
+-- be the result of the merge.
+function grid.Grid:mergeMulti(spaceList)
+  
+  -- Removes any duplicates of the first space, since otherwise the first space will be deleted
+  for i = 2, #spaceList do
+    if spaceList[i] == spaceList[1] then
+      table.remove(spaceList, i)
+    end
+  end
+  
+  -- Add the cells of all of the spaces to the first space
+  for i = 2, #spaceList do
+    spaceList[1]:mergeCells(spaceList[i])
+  end
+  
+  -- Replace all occurences of the other spaces with the first space
+  for i = 2, #spaceList do
+    for colNum, col in pairs(spaceList[i].cells) do
+      for rowNum, _ in pairs(col) do
+        self.spacesGrid[colNum][rowNum] = spaceList[1]
+      end
+    end
+  end
+  
+  -- Remove the other spaces from the list of spaces
+  for i = 2, #spaceList do
+    self.spacesList[spaceList[i]] = nil
+  end
+
+  -- Sees if there are any non-adjacent parts, and splits them off
+  self:attemptSplit(spaceList[1])
+end
+
+
+--- Merges two Spaces together, given their coordinates.
+function grid.Grid:mergeCoordinates(col1, row1, col2, row2)
+  self:merge(self.spacesGrid[col1][row1], self.spacesGrid[col2][row2])
 end
 
 
@@ -301,7 +358,9 @@ function grid.Grid:attemptSplit(space)
         
         allConnected = false
 
-      end
+    end
+    
+
       
     end
   end
@@ -315,6 +374,7 @@ function grid.Grid:attemptSplit(space)
     -- The possibility of more than two new spaces means that a recursive check
     -- is necessary to truly split the space.
     newSpace = self.spacesGrid[pointList[1].x][pointList[1].y]
+
     self:attemptSplit(newSpace)
   end
   
@@ -357,7 +417,7 @@ function grid.Grid:deleteCell(col, row)
   -- If the cell is the space's only cell, then remove the space entirely
   if spaceIsCell then
     self.spacesList[space] = nil
-    
+
   -- Otherwise, remove the cell from the space's cell list
   else
     space:removeCell(col, row)
@@ -369,6 +429,78 @@ function grid.Grid:deleteCell(col, row)
 end
 
 
+--- Adds an enemy object to the level.
+-- If the enemy is nil, then this doesn't do anything.
+function grid.Grid:addEnemy(enemy)
+  if enemy then
+    self.enemyList[enemy] = true
+  else
+    print("Tried to add a nil enemy!")
+  end
+end
+
+
+--- Makes all the enemies in the level take their turn.
+function grid.Grid:doEnemyTurns(player)
+  for enemy, _ in pairs(self.enemyList) do
+    enemy:takeTurn(self, player)
+  end
+end
+
+
+--- Draws all the enemies in the level.
+function grid.Grid:drawEnemies(gridXOffset, gridYOffset, pixel, tileSize)
+  for enemy, _ in pairs(self.enemyList) do
+    enemy:draw(gridXOffset, gridYOffset, pixel, tileSize)
+  end
+end
+
+
+--- Updates the distanceToPlayer of every space on the grid.
+function grid.Grid:updateDistances(space)
+  local spacesInCurrentLayer = 1
+  local spacesInNextLayer = 0
+  
+  local distance = 0
+  local toSearch = {space}
+  local searched = {}
+  searched[space] = true
+  
+  while #toSearch > 0 do
+
+    toSearch[1].distanceFromPlayer = distance
+    
+    -- Visits all adjacent spaces
+    for adjacentSpace, _ in pairs(toSearch[1].adjacentList) do
+      
+      -- If the space hasn't been visited yet, then add it to the list of things to search
+      if not searched[adjacentSpace] then
+        table.insert(toSearch, adjacentSpace)
+        searched[adjacentSpace] = true
+        spacesInNextLayer = spacesInNextLayer + 1
+      end
+      
+    end
+    
+    -- Remove the space that was just searched from the search list
+    table.remove(toSearch, 1)
+    
+    -- Decrement the amount of spaces left in this layer
+    spacesInCurrentLayer = spacesInCurrentLayer - 1
+    
+    -- If we're done with this layer, everything in the next layer will be one space further
+    if spacesInCurrentLayer == 0 then
+      spacesInCurrentLayer = spacesInNextLayer
+      spacesInNextLayer = 0
+      distance = distance + 1
+    end
+    
+  end
+  
+end
+
+
+--- Draws a grid on the screen.
 function grid.Grid:drawDebug(xOffset, yOffset, tileSize)
   local x
   local y
@@ -387,6 +519,28 @@ function grid.Grid:drawDebug(xOffset, yOffset, tileSize)
     end
   end
 end
+
+
+--- Draws a number for each cell representing how far away the cell is from the player.
+function grid.Grid:drawDistances(xOffset, yOffset, tileSize)
+  local x
+  local y
+  
+  love.graphics.setColor(graphics.COLOR_BLACK)
+  
+  for colNum, col in pairs(level.spacesGrid) do
+    for rowNum, space in pairs(col) do
+      x = (colNum - 0.5) * tileSize + xOffset
+      y = (rowNum - 0.5) * tileSize + yOffset
+      
+      love.graphics.print("" .. space.distanceFromPlayer, x, y)
+    end
+  end
+  
+  love.graphics.setColor(graphics.COLOR_WHITE)
+  
+end
+
 
 return grid
 

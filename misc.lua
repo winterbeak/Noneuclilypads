@@ -39,13 +39,49 @@ end
 -- Converts a list of booleans into 
 -- The list of booleans must be numerically indexed.
 function misc.toBits(booleanList)
-  bits = 0
+  local bits = 0
   for i = 1, #booleanList do
     if booleanList[i] then
       bits = bit.bor(bits, bit.lshift(1, i - 1))
     end
   end
   return bits
+end
+
+
+--- Returns the amount of key/value pairs in a table.
+function misc.length(list)
+  local length = 0
+  
+  for _, _ in pairs(list) do
+    length = length + 1
+  end
+  
+  return length
+end
+
+
+--- Randomly returns one of the elements of a set.
+-- A set is a list where every key is of the form <key> = true.
+-- Returns nil if there are no items in the list.
+function misc.randomChoice(list)
+  
+  local length = misc.length(list)
+  
+  if length == 0 then
+    return nil
+  end
+  
+  local chosenIndex = math.random(1, length)
+  local currentIndex = 1
+  for value, _ in pairs(list) do
+    if currentIndex == chosenIndex then
+      return value
+    end
+    
+    currentIndex = currentIndex + 1
+  end
+  
 end
 
 

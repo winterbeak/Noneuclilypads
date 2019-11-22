@@ -73,9 +73,11 @@ end
 
 --- Draws the sprite, except shifted in its box.  Anything outside the box is cropped out.
 -- Assumes that the sprite faces leftwards by default.
--- Forward shift is always in front of the sprite.  Positive shifts forwards, negative shifts backwards.
--- Sideways shift is always beside the sprite.  Positive shifts rightwards relative to the sprite's
--- direction, and negative shifts leftwards.
+-- Forward shift is always in front of the sprite.
+-- Positive shifts forwards, negative shifts backwards.  Without rotation, positive is left.
+-- Sideways shift is always beside the sprite.
+-- Positive shifts rightwards relative to the sprite's direction, and negative shifts leftwards.
+-- Without rotation, positive is up.
 -- The rotation amount MUST be orthogonal to 0; it can only be 0, pi/2, pi, or pi/2*3
 function graphics.SpriteSheet:drawShifted(spriteNum, x, y, forwardsShift, sidewaysShift, scale, rotation)
   
@@ -170,10 +172,45 @@ function graphics.SpriteSheet:drawShifted(spriteNum, x, y, forwardsShift, sidewa
 end
 
 
+--- Draws a sprite, but chopped off at the sides.
+-- The x and y coordinates are where the top left of the sprite is drawn.  Note
+-- that cropping changes the top left of the sprite.
+-- The crops take place BEFORE the scale!
+function graphics.SpriteSheet:drawCropped(spriteNum, x, y, leftCrop, upCrop, downCrop, rightCrop, scale)
+  
+  local quadX = leftCrop
+  local quadY = upCrop + ((spriteNum - 1) * self.singleHeight)
+  local quadWidth = self.width - leftCrop - rightCrop
+  local quadHeight = self.singleHeight - upCrop - downCrop
+  
+  local quad = love.graphics.newQuad(quadX, quadY, quadWidth, quadHeight, self.width, self.fullHeight)
+  
+  love.graphics.draw(self.image, quad, x, y, 0, scale, scale)
+end
+
+
+--- Draws a sprite, but chopped off at the sides.
+-- The x and y coordinates are where the top left of the original, non-cropped sprite is drawn
+-- The crops take place BEFORE the scale!
+function graphics.SpriteSheet:drawPartial(spriteNum, x, y, leftCrop, upCrop, downCrop, rightCrop, scale)
+  
+  local quadX = leftCrop
+  local quadY = upCrop + ((spriteNum - 1) * self.singleHeight)
+  local quadWidth = self.width - leftCrop - rightCrop
+  local quadHeight = self.singleHeight - upCrop - downCrop
+  
+  x = x + (leftCrop * scale)
+  y = y + (upCrop * scale)
+
+  local quad = love.graphics.newQuad(quadX, quadY, quadWidth, quadHeight, self.width, self.fullHeight)
+  
+  love.graphics.draw(self.image, quad, x, y, 0, scale, scale)
+end
+
 
 --- Randomly picks one of the spritesheet's sprites, and draws it.
 function graphics.SpriteSheet:drawRandom(x, y, scale, rotation)
-  local rotation = rotation or 0
+  rotation = rotation or 0
   local quad = math.random(1, self.spriteCount)
   love.graphics.draw(self.image, self.quads[quad], x, y, rotation, scale, scale)
 end

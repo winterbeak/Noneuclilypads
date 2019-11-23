@@ -217,6 +217,10 @@ graphics.Animation = {}
 -- This class keeps track of the current frame of an animation.
 -- The animation graphics are a SpriteSheet.
 function graphics.Animation:new(spriteSheet)
+  if not spriteSheet then
+    error("nil was passed as an animation's spritesheet!")
+  end
+  
   local newObj = {
     spriteSheet = spriteSheet,
     

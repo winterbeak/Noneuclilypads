@@ -23,6 +23,9 @@ for i = 1, 4 do
   snake.moveCounterClockwiseSpriteSheets[i] = graphics.SpriteSheet:new("snake"..i.."MoveCounterClockwise.png", 7)
 end
 
+snake.tailWaggle1SpriteSheet = graphics.SpriteSheet:new("snakeTailWaggle1.png", 8)
+snake.tailWaggle2SpriteSheet = graphics.SpriteSheet:new("snakeTailWaggle2.png", 5)
+
 
 snake.Snake = {}
 
@@ -33,7 +36,11 @@ function snake.Snake:new(spaceList, directionList)
   
   local newObj = {
     moveTimer = 0,
-    animation = nil,
+    
+    tailAnimation = nil,
+    idleAnim1 = graphics.Animation:new(snake.tailWaggle1SpriteSheet),
+    idleAnim2 = graphics.Animation:new(snake.tailWaggle2SpriteSheet),
+    
     moveStraightAnims = {},
     moveClockwiseAnims = {},
     moveCounterClockwiseAnims = {},
@@ -44,6 +51,8 @@ function snake.Snake:new(spaceList, directionList)
     previousTailDirection = nil
   }
   
+  newObj.idleAnim1:setFrameLength(6)
+  newObj.idleAnim2:setFrameLength(4)
   
   -- Creates all the bodies, and initializes the straight-movement animations
   for i = 1, snake.LENGTH do
@@ -297,7 +306,18 @@ end
 -- Snakes always wait two turns, then move closer to the player.
 function snake.Snake:takeTurn(level, player)
   self.moveTimer = self.moveTimer + 1
-  if self.moveTimer == 3 then
+  
+  -- Updates tail waggle animations
+  if self.moveTimer == 1 then
+    self.idleAnim1:reset()
+    self.tailAnimation = self.idleAnim1
+    
+  elseif self.moveTimer == 2 then
+    self.idleAnim2:reset()
+    self.tailAnimation = self.idleAnim2
+    
+  -- Makes the snake move
+  elseif self.moveTimer == 3 then
     
     -- If the snake is beside the player, hurt them
     if self.bodyList[1].space.distanceFromPlayer == 1 then
@@ -321,8 +341,30 @@ function snake.Snake:drawIdle(bodyNum, gridXOffset, gridYOffset, scale, tileSize
   local spriteSheet
   local spriteNum
   
-  -- Head and tail are always drawn straight
-  if bodyNum == 1 or bodyNum == snake.LENGTH then
+  -- Head is always drawn straight
+  if bodyNum == 1 then
+    spriteSheet = snake.idleStraightSpriteSheet
+    spriteNum = bodyNum
+    
+  elseif bodyNum == snake.LENGTH then
+    
+    -- Draws tail wagging animation
+    if self.moveTimer == 1 or self.moveTimer == 2 then
+      rotation = misc.rotationOf(self.bodyList[bodyNum].moveDirection)
+  
+      for colNum, col in pairs(self.bodyList[bodyNum].space.cells) do
+        for rowNum, _ in pairs(col) do
+          x = gridXOffset + ((colNum - 1) * tileSize)
+          y = gridYOffset + ((rowNum - 1) * tileSize)
+          
+          self.tailAnimation:draw(x, y, scale, rotation)
+        end
+      end
+      
+      return
+    end
+    
+    -- Otherwise, sets up the tail to be drawn normally
     spriteSheet = snake.idleStraightSpriteSheet
     spriteNum = bodyNum
     
@@ -448,6 +490,14 @@ function snake.Snake:updateAnimation()
     for i = 1, snake.LENGTH - 1 do
       self.moveClockwiseAnims[i]:update()
       self.moveCounterClockwiseAnims[i]:update()
+    end
+  
+  -- Tail waggle animations
+  elseif self.moveTimer == 1 or self.moveTimer == 2 then
+    self.tailAnimation:update()
+    
+    if self.tailAnimation.isDone then
+      self.tailAnimation:reset()
     end
   end
   

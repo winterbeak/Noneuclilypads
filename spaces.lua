@@ -2,10 +2,10 @@
 -- Note that spaces cannot work by themselves.  Please do not use any of the
 -- below function; only interact with spaces using Grid's commands.
 
-local graphics = require("graphics")
-local const = require("const")
-local vector = require("vector")
-local misc = require("misc")
+graphics = require("graphics")
+const = require("const")
+vector = require("vector")
+misc = require("misc")
 
 local spaces = {}
 

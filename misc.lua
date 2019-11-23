@@ -36,7 +36,7 @@ function misc.boolString(boolean)
 end
 
 
--- Converts a list of booleans into 
+-- Converts a list of booleans into a single integer, by setting trues to 1 and falses to 0.
 -- The list of booleans must be numerically indexed.
 function misc.toBits(booleanList)
   local bits = 0
@@ -82,6 +82,87 @@ function misc.randomChoice(list)
     currentIndex = currentIndex + 1
   end
   
+end
+
+
+--- Returns the direction that is 90 degrees clockwise to the given direction.
+function misc.clockwiseTo(direction)
+  if not direction then
+    error("Nil passed to clockwiseTo()!")
+  end
+  
+  if direction == "left" then
+    return "up"
+  elseif direction == "up" then
+    return "right"
+  elseif direction == "right" then
+    return "down"
+  elseif direction == "down" then
+    return "left"
+  else
+    error("Invalid direction '" .. direction .. "' passed to clockwiseTo()!")
+  end
+end
+
+
+--- Returns the direction that is 180 degrees clockwise to the given direction.
+function misc.oppositeOf(direction)
+  if not direction then
+    error("Nil passed to oppositeOf()!")
+  end
+  
+  if direction == "left" then
+    return "right"
+  elseif direction == "up" then
+    return "down"
+  elseif direction == "right" then
+    return "left"
+  elseif direction == "down" then
+    return "up"
+  else
+    error("Invalid direction '" .. direction .. "' passed to oppositeOf()!")
+  end
+end
+
+
+--- Returns the direction that is 90 degrees counterclockwise to the given direction.
+function misc.counterClockwiseTo(direction)
+  if not direction then
+    error("Nil passed to counterClockwiseTo()!")
+  end
+  
+  if direction == "left" then
+    return "down"
+  elseif direction == "up" then
+    return "left"
+  elseif direction == "right" then
+    return "up"
+  elseif direction == "down" then
+    return "right"
+  else
+    error("Invalid direction '" .. direction .. "' counterClockwiseTo()!")
+  end
+end
+
+
+--- Returns the angle, in radians, of given direction, given that left is 0 and the
+-- angles go counterclockwise.
+function misc.rotationOf(direction)
+  if not direction then
+    error("Nil passed to rotationOf()!")
+  end
+  
+  if direction == "left" then
+    return 0
+  elseif direction == "up" then
+    return math.pi / 2
+  elseif direction == "right" then
+    return math.pi
+  elseif direction == "down" then
+    return math.pi / 2 * 3
+  else
+    error("Invalid direction '" .. direction .. "' passed to rotationOf()!")
+  end
 end
 
 

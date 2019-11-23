@@ -1,11 +1,11 @@
 -- The main code used to run the game.
 
-local misc = require("misc")
-local grid = require("grid")
-local bodies = require("bodies")
-local spaces = require("spaces")
-local graphics = require("graphics")
-local levelgen = require("levelgen")
+misc = require("misc")
+grid = require("grid")
+entities = require("entities")
+spaces = require("spaces")
+graphics = require("graphics")
+levelgen = require("levelgen")
 
 local gridXOffset = 150
 local gridYOffset = 50
@@ -97,11 +97,12 @@ function love.load()
   math.randomseed(os.time())
   
   level = levelgen.testingLevel()
-  level:addEnemy(bodies.Rat:new(level.spacesGrid[5][4]))
-  level:addEnemy(bodies.Snake:newRandom(level.spacesGrid[7][7]))
-  level:addEnemy(bodies.Slug:new(level.spacesGrid[7][1]))
+  level:addEnemy(entities.Rat:new(level.spacesGrid[5][4]))
+  level:addEnemy(entities.Snake:newRandom(level.spacesGrid[5][5]))
+  --level:addEnemy(entities.Snake:newRandom(level.spacesGrid[6][7]))
+  level:addEnemy(entities.Slug:new(level.spacesGrid[7][1]))
   
-  player = bodies.Player:new(level.spacesGrid[1][1])
+  player = entities.Player:new(level.spacesGrid[1][1])
   
   level:updateDistances(player.body.space)
 

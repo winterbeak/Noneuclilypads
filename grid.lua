@@ -1,10 +1,10 @@
 --- Handles all of the spaces in a particular grid.
 
-local const = require("const")
-local misc = require("misc")
-local vector = require("vector")
-local spaces = require("spaces")
-local graphics = require("graphics")
+const = require("const")
+misc = require("misc")
+vector = require("vector")
+spaces = require("spaces")
+graphics = require("graphics")
 
 local grid = {}
 

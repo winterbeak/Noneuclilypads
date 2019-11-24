@@ -145,6 +145,8 @@ function love.update(dt)
     enemy:updateAnimation()
   end
   
+  level:updateAllSpaces()
+  
   -- What happens when the mouse is clicked
   if not lockMovement and mouseReleased then
     

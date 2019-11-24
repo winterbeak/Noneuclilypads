@@ -8,20 +8,13 @@ local snake = {}
 snake.LENGTH = 5
 
 snake.idleStraightSpriteSheet = graphics.SpriteSheet:new("snakeIdleStraight.png", 5)
-snake.moveStraightSpriteSheets = {}
-for i = 1, 6 do
-  snake.moveStraightSpriteSheets[i] = graphics.SpriteSheet:new("snake"..i.."MoveStraight.png", 7)
-end
+snake.moveStraightSpriteSheets = graphics.loadMulti("snake", 6, "MoveStraight.png", 7)
 
 snake.idleClockwiseSpriteSheet = graphics.SpriteSheet:new("snakeIdleClockwise.png", 3)
-snake.moveClockwiseSpriteSheets = {}
+snake.moveClockwiseSpriteSheets = graphics.loadMulti("snake", 4, "MoveClockwise.png", 7)
 
 snake.idleCounterClockwiseSpriteSheet = graphics.SpriteSheet:new("snakeIdleCounterClockwise.png", 3)
-snake.moveCounterClockwiseSpriteSheets = {}
-for i = 1, 4 do
-  snake.moveClockwiseSpriteSheets[i] = graphics.SpriteSheet:new("snake"..i.."MoveClockwise.png", 7)
-  snake.moveCounterClockwiseSpriteSheets[i] = graphics.SpriteSheet:new("snake"..i.."MoveCounterClockwise.png", 7)
-end
+snake.moveCounterClockwiseSpriteSheets = graphics.loadMulti("snake", 4, "MoveCounterClockwise.png", 7)
 
 snake.tailWaggle1SpriteSheet = graphics.SpriteSheet:new("snakeTailWaggle1.png", 8)
 snake.tailWaggle2SpriteSheet = graphics.SpriteSheet:new("snakeTailWaggle2.png", 5)
@@ -41,9 +34,9 @@ function snake.Snake:new(spaceList, directionList)
     idleAnim1 = graphics.Animation:new(snake.tailWaggle1SpriteSheet),
     idleAnim2 = graphics.Animation:new(snake.tailWaggle2SpriteSheet),
     
-    moveStraightAnims = {},
-    moveClockwiseAnims = {},
-    moveCounterClockwiseAnims = {},
+    moveStraightAnims = graphics.multiAnim(snake.moveStraightSpriteSheets),
+    moveClockwiseAnims = graphics.multiAnim(snake.moveClockwiseSpriteSheets),
+    moveCounterClockwiseAnims = graphics.multiAnim(snake.moveCounterClockwiseSpriteSheets),
     
     bodyList = {},
     
@@ -54,29 +47,17 @@ function snake.Snake:new(spaceList, directionList)
   newObj.idleAnim1:setFrameLength(6)
   newObj.idleAnim2:setFrameLength(4)
   
-  -- Creates all the bodies, and initializes the straight-movement animations
+  graphics.setMultiAnimFrameLength(newObj.moveStraightAnims, 3)
+  graphics.setMultiAnimFrameLength(newObj.moveClockwiseAnims, 3)
+  graphics.setMultiAnimFrameLength(newObj.moveCounterClockwiseAnims, 3)
+  
+  -- Creates all the bodies
   for i = 1, snake.LENGTH do
     newObj.bodyList[i] = bodies.WarpBody:new(spaceList[i])
     newObj.bodyList[i].flyCount = 1
-    
-    newObj.moveStraightAnims[i] = graphics.Animation:new(snake.moveStraightSpriteSheets[i])
-    newObj.moveStraightAnims[i]:setFrameLength(3)
-  end
-  
-  -- Initializes the last straight-movement animation
-  local lastAnim = graphics.Animation:new(snake.moveStraightSpriteSheets[snake.LENGTH + 1])
-  newObj.moveStraightAnims[snake.LENGTH + 1] = lastAnim
-  newObj.moveStraightAnims[snake.LENGTH + 1]:setFrameLength(3)
-  
-  -- Initializes the curved movement animations
-  for i = 1, snake.LENGTH - 1 do
-    newObj.moveClockwiseAnims[i] = graphics.Animation:new(snake.moveClockwiseSpriteSheets[i])
-    newObj.moveClockwiseAnims[i]:setFrameLength(3)
-    newObj.moveCounterClockwiseAnims[i] = graphics.Animation:new(snake.moveCounterClockwiseSpriteSheets[i])
-    newObj.moveCounterClockwiseAnims[i]:setFrameLength(3)
   end
 
-  
+  -- Determines the initial direction of all the parts
   for i = 1, snake.LENGTH do
     newObj.bodyList[i].moveDirection = directionList[i]
   end
@@ -249,7 +230,7 @@ end
 -- The rest of the parts follow the part before it.
 function snake.Snake:move(player)
   local closestSpace
-  local closestSpaceDirection
+  local closestDirection
   
   local direction
   local previousSpace
@@ -257,20 +238,11 @@ function snake.Snake:move(player)
   local previousDirection
   local nextDirection
   
-  -- Rerolls the space until the snake isn't moving backwards
-  for i = 1, 25 do
-    
-    closestSpace = self.bodyList[1].space:closestAdjacent(player)
-    closestSpaceDirection = self.bodyList[1].space:directionOf(closestSpace)
-    
-    if self.bodyList[1].moveDirection == misc.oppositeOf(closestSpaceDirection) then
-      closestSpace = nil
-    else
-      break
-    end
-    
-  end
-  
+  -- Finds the closest space that isn't moving backwards
+  local head = self.bodyList[1]
+  local restricted = misc.oppositeOf(head.moveDirection)
+  closestSpace, closestDirection = head.space:closestAdjacentNotDirection(player, restricted)
+
   if closestSpace then
     
     self.previousTailDirection = self.bodyList[snake.LENGTH].moveDirection
@@ -483,14 +455,9 @@ end
 --- Updates the snake's animation.  Should be called every frame.
 function snake.Snake:updateAnimation()
   if self.bodyList[1].moving then
-    for i = 1, snake.LENGTH + 1 do
-      self.moveStraightAnims[i]:update()
-    end
-    
-    for i = 1, snake.LENGTH - 1 do
-      self.moveClockwiseAnims[i]:update()
-      self.moveCounterClockwiseAnims[i]:update()
-    end
+    graphics.updateMultiAnim(self.moveStraightAnims)
+    graphics.updateMultiAnim(self.moveClockwiseAnims)
+    graphics.updateMultiAnim(self.moveCounterClockwiseAnims)
   
   -- Tail waggle animations
   elseif self.moveTimer == 1 or self.moveTimer == 2 then
@@ -504,15 +471,11 @@ function snake.Snake:updateAnimation()
   if self.moveStraightAnims[1].isDone then
     for i = 1, snake.LENGTH do
       self.bodyList[i].moving = false
-      self.moveStraightAnims[i]:reset()
     end
     
-    self.moveStraightAnims[snake.LENGTH + 1]:reset()
-    
-    for i = 1, snake.LENGTH - 1 do
-      self.moveClockwiseAnims[i]:reset()
-      self.moveCounterClockwiseAnims[i]:reset()
-    end
+    graphics.resetMultiAnim(self.moveStraightAnims)
+    graphics.resetMultiAnim(self.moveClockwiseAnims)
+    graphics.resetMultiAnim(self.moveCounterClockwiseAnims)
     
     -- Update's the tail's direction, as it faces a different direction during
     -- the animation

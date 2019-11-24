@@ -263,6 +263,11 @@ end
 -- be the result of the merge.
 function grid.Grid:mergeMulti(spaceList)
   
+  -- If there is one or fewer spaces, then no merging has to be done
+  if #spaceList < 2 then
+    return
+  end
+  
   -- Removes any duplicates of the first space, since otherwise the first space will be deleted
   for i = 2, #spaceList do
     if spaceList[i] == spaceList[1] then
@@ -374,8 +379,13 @@ function grid.Grid:attemptSplit(space)
     -- The possibility of more than two new spaces means that a recursive check
     -- is necessary to truly split the space.
     newSpace = self.spacesGrid[pointList[1].x][pointList[1].y]
-
+    
     self:attemptSplit(newSpace)
+    
+    -- Explodes the new space if the old space was exploding
+    if space.exploding then
+      newSpace:explodeSlime()
+    end
   end
   
 end
@@ -452,6 +462,14 @@ end
 function grid.Grid:drawEnemies(gridXOffset, gridYOffset, pixel, tileSize)
   for enemy, _ in pairs(self.enemyList) do
     enemy:draw(gridXOffset, gridYOffset, pixel, tileSize)
+  end
+end
+
+
+--- Updates all of the spaces.
+function grid.Grid:updateAllSpaces()
+  for space, _ in pairs(self.spacesList) do
+    space:update()
   end
 end
 

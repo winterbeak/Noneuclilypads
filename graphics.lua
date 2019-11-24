@@ -24,6 +24,19 @@ graphics.COLOR_WATER_SHADOW = graphics.convertColor({0, 0, 0, 76})
 love.graphics.setDefaultFilter("nearest", "nearest")
 
 
+--- Some weird shader thing copied off of the Love2D wiki page that allows
+-- me to use an image as a stencil.  Transparent values are not drawn on, but everything else is.
+graphics.mask_shader = love.graphics.newShader[[
+   vec4 effect(vec4 color, Image texture, vec2 texture_coords, vec2 screen_coords) {
+      if (Texel(texture, texture_coords).rgb == vec3(0.0)) {
+         // a discarded pixel wont be applied as the stencil.
+         discard;
+      }
+      return vec4(1.0);
+   }
+]]
+
+
 graphics.SpriteSheet = {}
 
 --- Constructor.  Creates a new spritesheet.
@@ -211,6 +224,17 @@ function graphics.SpriteSheet:drawRandom(x, y, scale, rotation)
 end
 
 
+--- Returns a list of spritesheets, each loaded from the same file name except the number
+-- is different.
+function graphics.loadMulti(pathStart, sheetCount, pathEnd, spriteCount)
+  local list = {}
+  for i = 1, sheetCount do
+    list[i] = graphics.SpriteSheet:new(pathStart .. i .. pathEnd, spriteCount)
+  end
+  return list
+end
+
+
 graphics.Animation = {}
 
 --- Constructor.  Creates a new instance of an animation.
@@ -324,6 +348,41 @@ end
 --- Draws the current frame, except shifted in its box.  Anything outside the box is cropped out.
 function graphics.Animation:drawShifted(x, y, xOffset, yOffset, scale, rotation)
   self.spriteSheet:drawShifted(self.frame, x, y, xOffset, yOffset, scale, rotation)
+end
+
+
+--- Returns a list of animations, one for each spritesheet in a numerically indexed list.
+function graphics.multiAnim(multiSpriteSheetList)
+  local list = {}
+  for i = 1, #multiSpriteSheetList do
+    list[i] = graphics.Animation:new(multiSpriteSheetList[i])
+  end
+  
+  return list
+end
+
+
+--- Sets the frame length of a numerically indexed list of animations.
+function graphics.setMultiAnimFrameLength(multiAnim, length)
+  for i = 1, #multiAnim do
+    multiAnim[i]:setFrameLength(length)
+  end
+end
+
+
+--- Updates a numerically indexed list of animations.
+function graphics.updateMultiAnim(multiAnim)
+  for i = 1, #multiAnim do
+    multiAnim[i]:update()
+  end
+end
+
+
+--- Resets a numerically indexed list of animations.
+function graphics.resetMultiAnim(multiAnim)
+  for i = 1, #multiAnim do
+    multiAnim[i]:reset()
+  end
 end
 
 

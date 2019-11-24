@@ -20,7 +20,7 @@ function rat.Rat:new(startSpace)
     idleAnim2 = graphics.Animation:new(rat.idle2SpriteSheet),
     jumpAnim = graphics.Animation:new(rat.jumpSpriteSheet),
     
-    moveTimer = 0,
+    moveTimer = math.random(0, 1),
     animation = nil,
     
     body = bodies.WarpBody:new(startSpace),
@@ -28,7 +28,12 @@ function rat.Rat:new(startSpace)
   
   newObj.idleAnim2:setFrameLength(6)
   newObj.jumpAnim:setFrameLength(3)
-  newObj.animation = newObj.idleAnim1
+  
+  if newObj.moveTimer == 0 then
+    newObj.animation = newObj.idleAnim1
+  elseif newObj.moveTimer == 1 then
+    newObj.animation = newObj.idleAnim2
+  end
   
   newObj.body.flyCount = 3
   

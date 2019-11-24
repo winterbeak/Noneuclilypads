@@ -18,6 +18,12 @@ spaces.multiPadsHighlightSprite = graphics.SpriteSheet:new("multiPadsHighlighted
 spaces.decorSprite = graphics.SpriteSheet:new("decor.png", 24)
 spaces.decorShadowlessSprite = graphics.SpriteSheet:new("decorShadowless.png", 24)
 
+spaces.slugSlime = graphics.SpriteSheet:new("slugSlime.png", 12)
+spaces.singlePadsMask = graphics.SpriteSheet:new("singlePadsMask.png", 16)
+spaces.multiPadsMask = graphics.SpriteSheet:new("multiPadsMask.png", 15)
+
+spaces.slimeExplosions = graphics.loadMulti("slimeExplosion", 3, ".png", 4)
+
 
 --- Draws a square, and its shadow if an offset is given.
 -- Does not change love's graphics color.
@@ -57,7 +63,17 @@ function spaces.Space:new(col, row, spriteNum, decorNum)
     distanceFromPlayer = 0,
     
     spriteNum = spriteNum or 1,
-    decorNum = decorNum or nil
+    decorNum = decorNum or nil,
+    
+    slimed1 = false,
+    slimed2 = false,
+    slimeRotation1 = 0,
+    slimeRotation2 = 0,
+    slimeNum1 = 0,
+    slimeNum2 = 0,
+    
+    exploding = false,
+    explodingAnim = nil,
   }
   
   newObj.cells[col][row] = true
@@ -205,8 +221,7 @@ function spaces.Space:closestAdjacent(player)
       
       -- Always prioritize the player's previous space
       if space == player.body.previousSpace then
-        foundSpace = true
-        closestSpace = space
+        return space
         
       -- If this isn't the first space, compare it with the previous closest
       elseif foundSpace then
@@ -229,6 +244,44 @@ function spaces.Space:closestAdjacent(player)
 end
 
 
+--- Returns the closest space from the player (and its direction), that isn't in a given direction.
+-- Returns nil if there are no valid spaces.
+function spaces.Space:closestAdjacentNotDirection(player, restrictedDirection)
+  local foundSpace = false
+  local closestSpace
+  
+  for direction, spaceList in pairs(self.adjacent) do
+    if direction ~= restrictedDirection then
+      for space, _ in pairs(spaceList) do
+        
+        -- Ignore all already occupied spaces
+        if not space:isOccupied() then
+          
+          -- Always prioritize the player's previous space
+          if space == player.body.previousSpace then
+            return space, direction
+          
+          -- If this isn't the first space found, compare it with the previous closest
+          elseif foundSpace then
+            if space.distanceFromPlayer < closestSpace.distanceFromPlayer then
+              closestSpace = space
+            end
+          
+          -- If this is the first space, it must be the closest
+          else
+            foundSpace = true
+            closestSpace = space
+          end
+        end
+      end
+    end
+  end
+  
+  return closestSpace, direction
+  
+end
+
+
 --- Returns the direction of a space adjacent to this one.
 -- If the space is not adjacent, nil is returned.
 -- If the space is touching more than one directions, then the priority order
@@ -244,6 +297,45 @@ function spaces.Space:directionOf(space)
 end
 
 
+--- Adds slime to the space.
+-- If one of the directions is left as nil, then it will not be changed.
+function spaces.Space:addSlime(direction1, direction2)
+  if direction1 then
+    self.slimed1 = true
+    self.slimeRotation1 = misc.rotationOf(direction1)
+    self.slimeNum1 = math.random(1, spaces.slugSlime.spriteCount)
+  end
+  
+  if direction2 then
+    self.slimed2 = true
+    self.slimeRotation2 = misc.rotationOf(direction2)
+    self.slimeNum2 = math.random(1, spaces.slugSlime.spriteCount)
+  end
+end
+
+
+--- Removes slime from the space.
+-- If one of the directions is left as nil, then it will not be changed.
+function spaces.Space:removeSlime(direction1, direction2)
+  if direction1 then
+    self.slimed1 = false
+  end
+  
+  if direction2 then
+    self.slimed2 = false
+  end
+end
+
+
+--- Plays the slime exploding animation on this space.
+function spaces.Space:explodeSlime()
+  local explosion = spaces.slimeExplosions[math.random(1, #spaces.slimeExplosions)]
+  self.exploding = true
+  self.explodingAnim = graphics.Animation:new(explosion)
+  self.explodingAnim:setFrameLength(3)
+end
+
+
 --- Draws the space.
 -- gridX and gridY are the pixel coordinates of the top left of the space's grid.
 -- scale is how big to scale the art.
@@ -251,11 +343,14 @@ function spaces.Space:draw(gridX, gridY, scale, shadowOffsetX, shadowOffsetY, is
   local x
   local y
   local spriteSheet
+  local spriteNum
   local cellSize = spaces.singlePadsSprite.width * scale
   
   -- Draws a single cell space
   if self:isSingleCell() then
     local col, row = self:findACell()
+    
+    spriteNum = self.spriteNum
     
     -- Changes the spritesheet depending on whether the lillypad is highlighted
     if isSelected then
@@ -270,11 +365,37 @@ function spaces.Space:draw(gridX, gridY, scale, shadowOffsetX, shadowOffsetY, is
     
     -- Draws the shadow
     love.graphics.setColor(graphics.COLOR_WATER_SHADOW)
-    spriteSheet:draw(self.spriteNum, x + shadowOffsetX, y + shadowOffsetY, scale)
+    spriteSheet:draw(spriteNum, x + shadowOffsetX, y + shadowOffsetY, scale)
     
     -- Draws the sprite itself
     love.graphics.setColor(graphics.COLOR_WHITE)
-    spriteSheet:draw(self.spriteNum, x, y, scale)
+    spriteSheet:draw(spriteNum, x, y, scale)
+    
+    -- Draws the pad's slime
+    if self.slimed1 or self.slimed2 then
+      
+      -- Stencils the sprite so that it is only drawn on the pad and not in the water
+      love.graphics.stencil(function()
+          love.graphics.setShader(graphics.mask_shader)
+          spaces.singlePadsMask:draw(spriteNum, x, y, scale)
+          love.graphics.setShader()
+          end,
+          
+          "replace", 1)
+      love.graphics.setStencilTest("greater", 0)
+      
+      
+      if self.slimed1 then
+        spaces.slugSlime:draw(self.slimeNum1, x, y, scale, self.slimeRotation1)
+      end
+      
+      if self.slimed2 then
+        spaces.slugSlime:draw(self.slimeNum2, x, y, scale, self.slimeRotation2)
+      end
+      
+      love.graphics.setStencilTest()
+    end
+    
     
     -- Draws the sprite's decor
     -- If the shadow offset is a pixel or greater, draw the shadowed decor.
@@ -286,6 +407,13 @@ function spaces.Space:draw(gridX, gridY, scale, shadowOffsetX, shadowOffsetY, is
       spaces.decorShadowlessSprite:draw(self.decorNum, x, y, scale)
     end
     
+    
+    -- If the space has exploding slime, draw it
+    if self.exploding then
+      self.explodingAnim:draw(x, y, scale)
+    end
+    
+  
   -- Draws a multicell space
   else
     local lillypadColor
@@ -353,6 +481,30 @@ function spaces.Space:draw(gridX, gridY, scale, shadowOffsetX, shadowOffsetY, is
         -- Draws the sprite
         love.graphics.setColor(graphics.COLOR_WHITE)
         spriteSheet:draw(spriteNum, x, y, scale)
+        
+        -- Draws the pad's slime
+        if self.slimed1 or self.slimed2 then
+          
+          -- Stencils the sprite so that it is only drawn on the pad and not in the water
+          love.graphics.stencil(function()
+              love.graphics.setShader(graphics.mask_shader)
+              spaces.multiPadsMask:draw(spriteNum, x, y, scale)
+              love.graphics.setShader()
+              end,
+              
+              "replace", 1)
+          love.graphics.setStencilTest("greater", 0)
+          
+          if self.slimed1 then
+            spaces.slugSlime:draw(self.slimeNum1, x, y, scale, self.slimeRotation1)
+          end
+          
+          if self.slimed2 then
+            spaces.slugSlime:draw(self.slimeNum2, x, y, scale, self.slimeRotation2)
+          end
+          
+          love.graphics.setStencilTest()
+        end
 
         -- Draws the corner edge cases, pixel by pixel
         -- This is kinda dumb but i don't want to make more functions that pass around
@@ -503,10 +655,29 @@ function spaces.Space:draw(gridX, gridY, scale, shadowOffsetX, shadowOffsetY, is
         
         love.graphics.setColor(graphics.COLOR_WHITE)
         
+        -- If the space has exploding slime, draw it
+        if self.exploding then
+          self.explodingAnim:draw(x, y, scale)
+        end
+        
       end
     end
   end
   
+end
+
+
+--- Updates the space.
+function spaces.Space:update()
+  if self.exploding then
+    self.explodingAnim:update()
+    
+    if self.explodingAnim.isDone then
+      self.exploding = false
+      self.explodingAnim = nil
+    end
+    
+  end
 end
 
 

@@ -12,9 +12,10 @@ bodies.Flea = {}
 function bodies.Flea:new(startSpace)
   local newObj = {
     space = startSpace,
-    previousSpace = nil,
+    nextSpace = nil,
     moving = false,
     moveDirection = "left",
+    crossedSpace = false,
     
     xOffset = math.random(5, 19),
     yOffset = math.random(5, 19),
@@ -66,22 +67,25 @@ end
 
 
 function bodies.Flea:moveTo(space, direction)
-  self.previousSpace = self.space
-  self.space = space
+  self.nextSpace = space
+  self.crossedSpace = false
   self.moving = true
+  self.moveDirection = direction
   
-  self.targetX = math.random(5, 19)
-  self.targetY = math.random(5, 19)
+  local x = math.random(5, 19)
+  local y = math.random(5, 19)
   
   if direction == "left" then
-    self.targetX = self.targetX - 24
+    x = x - 24
   elseif direction == "up" then
-    self.targetY = self.targetY - 24
+    y = y - 24
   elseif direction == "right" then
-    self.targetX = self.targetX + 24
-  elseif direction == "left" then
-    self.targetY = self.targetY + 24
+    x = x + 24
+  elseif direction == "down" then
+    y = y + 24
   end
+  
+  self:changeTarget(x, y)
 end
 
 
@@ -90,6 +94,44 @@ end
 -- Currently, this makes the flea move towards its target,
 -- and sometimes randomly makes it change target.
 function bodies.Flea:update()
+  
+  -- Handles when the flea crosses the border to another space
+  if self.moving and not self.crossedSpace then
+    if self.moveDirection == "left" then
+      if self.xOffset < 0 then
+        self.xOffset = self.xOffset + 24
+        self.targetX = self.targetX + 24
+        self.space = self.nextSpace
+        self.crossedSpace = true
+      end
+      
+    elseif self.moveDirection == "up" then
+      if self.yOffset < 0 then
+        self.yOffset = self.yOffset + 24
+        self.targetY = self.targetY + 24
+        self.space = self.nextSpace
+        self.crossedSpace = true
+      end
+      
+    elseif self.moveDirection == "right" then
+      if self.xOffset > 24 then
+        self.xOffset = self.xOffset - 24
+        self.targetX = self.targetX - 24
+        self.space = self.nextSpace
+        self.crossedSpace = true
+      end
+      
+    elseif self.moveDirection == "down" then
+      if self.yOffset > 24 then
+        self.yOffset = self.yOffset - 24
+        self.targetY = self.targetY - 24
+        self.space = self.nextSpace
+        self.crossedSpace = true
+      end
+    end
+  end
+  
+    
 
   -- 1 in 300 chance every frame to change targets
   if self.atTarget then
@@ -112,6 +154,7 @@ function bodies.Flea:update()
         self.xOffset = self.targetX
         self.yOffset = self.targetY
         self.atTarget = true
+        self.moving = false
       end
     end
     
@@ -197,6 +240,8 @@ function bodies.WarpBody:moveTo(space, direction)
   
   self.moveDirection = direction
   self.moving = true
+  
+  self:moveBugsTo(space, direction)
 end
 
 
@@ -216,6 +261,14 @@ function bodies.WarpBody:removeBugs(count)
     end
     
     table.remove(self.bugs)
+  end
+end
+
+
+--- Moves all of the body's bugs to a certain space.
+function bodies.WarpBody:moveBugsTo(space, direction)
+  for i = 1, #self.bugs do
+    self.bugs[i]:moveTo(space, direction)
   end
 end
 

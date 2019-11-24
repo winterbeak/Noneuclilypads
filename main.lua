@@ -12,7 +12,7 @@ local gridXOffset = 150
 local gridYOffset = 50
 local pixel = 3
 local tileSize = (pixel * spaces.singlePadsSprite.width)
-local showFPS = false
+local showFPS = true
 
 
 --- Changes a few settings for gif recording.
@@ -120,7 +120,7 @@ function love.load()
   -- Tracks fps
   totalTime = 0
   totalFrames = 0
-  
+
 end
 
 

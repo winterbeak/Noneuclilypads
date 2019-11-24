@@ -169,11 +169,11 @@ function love.update(dt)
     
     if validMove then
       
-      -- Move the player
+      -- Eats flies, if the space eaten from was valid
       if eatFlies then
-        mouseSpace.occupiedBy:removeBugs(1)
-        player.energy = player.energy + 1
-        
+        player:eatBug(mouseSpace)
+      
+      -- Move the player, if the move was valid
       else
         lockMovement = true
         
@@ -255,9 +255,9 @@ function love.draw()
   
   level:drawDistances(gridXOffset, gridYOffset, tileSize)
   
-  player:draw(gridXOffset + playerXOffset, gridYOffset + playerYOffset, pixel, tileSize)
-  
   level:drawEnemies(gridXOffset, gridYOffset, pixel, tileSize)
+  
+  player:draw(gridXOffset + playerXOffset, gridYOffset + playerYOffset, pixel, tileSize)
   
   
   -- FPS counter

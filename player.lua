@@ -8,6 +8,8 @@ player.jumpOffsets = {0, 13, 22, 24, 24, 24}
 player.idleSpriteSheet = graphics.SpriteSheet:new("frogIdle.png", 1)
 player.jumpSpriteSheet = graphics.SpriteSheet:new("frogJump.png", 6)
 
+player.tongueBase = graphics.SpriteSheet:new("frogTongueBase.png", 9)
+player.tongueTip = graphics.SpriteSheet:new("frogTongueTip.png", 9)
 
 player.Player = {}
 
@@ -21,9 +23,18 @@ function player.Player:new(startSpace)
     
     body = bodies.WarpBody:new(startSpace),
     
-    energy = 0
+    energy = 0,
+    
+    eating = false,
+    eatSpace = nil,  -- The space that the player is eating bugs from
+    eatBody = nil,  -- The body that the player is eating bugs from
+    tongueBaseAnim = graphics.Animation:new(player.tongueBase),
+    tongueTipAnim = graphics.Animation:new(player.tongueTip),
   }
   newObj.jumpAnim:setFrameLength(3)
+  newObj.tongueBaseAnim:setFrameLength(3)
+  newObj.tongueTipAnim:setFrameLength(3)
+  
   newObj.animation = newObj.idleAnim
   
   self.__index = self
@@ -82,6 +93,20 @@ function player.Player:draw(gridXOffset, gridYOffset, scale, tileSize)
       end
     end
   end
+  
+  -- Draws the tip of the tongue on the eating space
+  if self.eating then
+    for colNum, col in pairs(self.eatSpace.cells) do
+      for rowNum, _ in pairs(col) do
+        
+        x = gridXOffset + ((colNum - 1) * tileSize)
+        y = gridYOffset + ((rowNum - 1) * tileSize)
+
+        self.tongueTipAnim:draw(x, y, scale, rotation)
+
+      end
+    end
+  end
 
 end
 
@@ -90,13 +115,54 @@ end
 function player.Player:updateAnimation()
   if self.body.moving then
     self.animation:update()
+    
+    if self.animation.isDone then
+      self.jumpAnim:reset()
+      self.animation = self.idleAnim
+      self.body.moving = false
+    end
+    
+  elseif self.eating then
+    self.tongueBaseAnim:update()
+    self.tongueTipAnim:update()
+    
+    if self.tongueBaseAnim.frame == 3 and self.tongueBaseAnim.delayCount == 0 then
+      self.eatBody:removeBugs(1)
+    end
+    
+    if self.animation.isDone then
+      self.tongueBaseAnim:reset()
+      self.tongueTipAnim:reset()
+      
+      self.energy = self.energy + 1
+      self.animation = self.idleAnim
+      self.eating = false
+    end
+    
   end
   
-  if self.animation.isDone then
-    self.jumpAnim:reset()
-    self.animation = self.idleAnim
-    self.body.moving = false
+end
+
+
+--- Makes the player eat a bug from a given space.
+function player.Player:eatBug(space)
+  if not space:isOccupied() then
+    error("The player tried to eat bugs from a space without an enemy!")
   end
+  if #space.occupiedBy.bugs <= 0 then
+    error("The player tried to eat bugs from a body without any bugs!")
+  end
+  
+  local direction = self.body.space:directionOf(space)
+  if not direction then
+    error("The player tried to eat a bug from a space that is not adjacent to the player's space!")
+  end
+  
+  self.eating = true
+  self.eatSpace = space
+  self.eatBody = space.occupiedBy
+  self.body.moveDirection = direction
+  self.animation = self.tongueBaseAnim
 end
 
 

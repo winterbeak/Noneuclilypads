@@ -1,5 +1,6 @@
 -- The main code used to run the game.
 
+gs = require("gs")
 misc = require("misc")
 grid = require("grid")
 entities = require("entities")
@@ -119,7 +120,7 @@ function love.load()
   -- Tracks fps
   totalTime = 0
   totalFrames = 0
-
+  
 end
 
 
@@ -141,9 +142,7 @@ function love.update(dt)
   player:updateAnimation()
   
   -- Updates enemy animations
-  for enemy, _ in pairs(level.enemyList) do
-    enemy:updateAnimation()
-  end
+  level:updateEnemies()
   
   level:updateAllSpaces()
   
@@ -155,7 +154,7 @@ function love.update(dt)
     
     if player.body.space.adjacentList[mouseSpace] then
       if mouseSpace:isOccupied() then
-        if mouseSpace.occupiedBy.flyCount > 0 then
+        if #mouseSpace.occupiedBy.bugs > 0 then
           validMove = true
           eatFlies = true
         else
@@ -172,7 +171,7 @@ function love.update(dt)
       
       -- Move the player
       if eatFlies then
-        mouseSpace.occupiedBy.flyCount = mouseSpace.occupiedBy.flyCount - 1
+        mouseSpace.occupiedBy:removeBugs(1)
         player.energy = player.energy + 1
         
       else

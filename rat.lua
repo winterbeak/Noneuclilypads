@@ -35,7 +35,7 @@ function rat.Rat:new(startSpace)
     newObj.animation = newObj.idleAnim2
   end
   
-  newObj.body.flyCount = 3
+  newObj.body:addFleas(3)
   
   self.__index = self
   return setmetatable(newObj, self)
@@ -128,6 +128,8 @@ function rat.Rat:draw(gridXOffset, gridYOffset, scale, tileSize)
       end
     end
   end
+  
+  self.body:drawBugs(gridXOffset, gridYOffset, scale, tileSize)
 
 end
 
@@ -152,6 +154,9 @@ function rat.Rat:updateAnimation()
     self.animation = self.idleAnim1
     self.body.moving = false
   end
+  
+  self.body:updateBugs()
+  
 end
 
 

@@ -54,7 +54,7 @@ function snake.Snake:new(spaceList, directionList)
   -- Creates all the bodies
   for i = 1, snake.LENGTH do
     newObj.bodyList[i] = bodies.WarpBody:new(spaceList[i])
-    newObj.bodyList[i].flyCount = 1
+    newObj.bodyList[i]:addFleas(1)
   end
 
   -- Determines the initial direction of all the parts
@@ -449,6 +449,10 @@ function snake.Snake:draw(gridXOffset, gridYOffset, scale, tileSize)
     
   end
   
+  for i = 1, snake.LENGTH do
+    self.bodyList[i]:drawBugs(gridXOffset, gridYOffset, scale, tileSize)
+  end
+  
 end
 
 
@@ -480,6 +484,10 @@ function snake.Snake:updateAnimation()
     -- Update's the tail's direction, as it faces a different direction during
     -- the animation
     self.bodyList[snake.LENGTH].moveDirection = self.bodyList[snake.LENGTH - 1].moveDirection
+  end
+  
+  for i = 1, snake.LENGTH do
+    self.bodyList[i]:updateBugs()
   end
 end
 

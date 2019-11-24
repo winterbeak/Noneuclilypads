@@ -458,6 +458,15 @@ function grid.Grid:doEnemyTurns(player)
 end
 
 
+--- Updates all enemies.
+-- Updates the enemy's animation, as well as their bugs.
+function grid.Grid:updateEnemies()
+  for enemy, _ in pairs(self.enemyList) do
+    enemy:updateAnimation()
+  end
+end
+
+
 --- Draws all the enemies in the level.
 function grid.Grid:drawEnemies(gridXOffset, gridYOffset, pixel, tileSize)
   for enemy, _ in pairs(self.enemyList) do

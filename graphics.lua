@@ -12,10 +12,15 @@ end
 
 graphics.COLOR_WHITE = graphics.convertColor({255, 255, 255})
 graphics.COLOR_BLACK = graphics.convertColor({0, 0, 0})
+
 graphics.COLOR_LILLYPAD = graphics.convertColor({145, 206, 50})
 graphics.COLOR_LILLYPAD_SHADOW = graphics.convertColor({94, 153, 0})
+graphics.COLOR_LILLYPAD_OUTLINE = graphics.convertColor({56, 90, 0})
+
 graphics.COLOR_LILLYPAD_HIGHLIGHT = graphics.convertColor({221, 221, 39})
 graphics.COLOR_LILLYPAD_SHADOW_HIGHLIGHT = graphics.convertColor({176, 176, 37})
+graphics.COLOR_LILLYPAD_OUTLINE_HIGHLIGHT = graphics.convertColor({114, 112, 17})
+
 graphics.COLOR_WATER = graphics.convertColor({0, 255, 182})
 graphics.COLOR_WATER_SHADOW = graphics.convertColor({0, 0, 0, 76})
 

@@ -41,7 +41,7 @@ function slug.Slug:new(startSpace)
     newObj.animation = newObj.readyAnims[1]
   end
   
-  newObj.body.flyCount = 5
+  newObj.body:addFleas(5)
   
   self.__index = self
   return setmetatable(newObj, self)
@@ -182,6 +182,9 @@ function slug.Slug:draw(gridXOffset, gridYOffset, scale, tileSize)
       end
     end
   end
+  
+  self.body:drawBugs(gridXOffset, gridYOffset, scale, tileSize)
+  
 end
 
 --- Updates the slug's animation.  Should be called every frame.
@@ -226,6 +229,8 @@ function slug.Slug:updateAnimation()
     end
     
   end
+  
+  self.body:updateBugs()
 end
 
 

@@ -16,7 +16,8 @@ spaces.multiPadsSprite = graphics.SpriteSheet:new("multiPads.png", 15)
 spaces.multiPadsHighlightSprite = graphics.SpriteSheet:new("multiPadsHighlighted.png", 15)
 
 spaces.decorSprite = graphics.SpriteSheet:new("decor.png", 24)
-spaces.decorShadowlessSprite = graphics.SpriteSheet:new("decorShadowless.png", 24)
+spaces.decorHighlightSprite = graphics.SpriteSheet:new("decorHighlighted.png", 24)
+spaces.decorShadowlessSprite = graphics.SpriteSheet:new("decorShadowlessHighlighted.png", 24)
 
 spaces.slugSlime = graphics.SpriteSheet:new("slugSlime.png", 12)
 spaces.singlePadsMask = graphics.SpriteSheet:new("singlePadsMask.png", 16)
@@ -342,6 +343,7 @@ end
 function spaces.Space:draw(gridX, gridY, scale, shadowOffsetX, shadowOffsetY, isSelected)
   local x
   local y
+  local decorSheet
   local spriteSheet
   local spriteNum
   local cellSize = spaces.singlePadsSprite.width * scale
@@ -355,8 +357,17 @@ function spaces.Space:draw(gridX, gridY, scale, shadowOffsetX, shadowOffsetY, is
     -- Changes the spritesheet depending on whether the lillypad is highlighted
     if isSelected then
       spriteSheet = spaces.singlePadsHighlightSprite
+      
+      if shadowOffsetX == 0 and shadowOffsetY == 0 then
+        decorSheet = spaces.decorShadowlessSprite
+      else
+        decorSheet = spaces.decorHighlightSprite
+      end
+      
     else
       spriteSheet = spaces.singlePadsSprite
+      decorSheet = spaces.decorSprite
+      
     end
     
     -- Calculates the position to draw the top left of the sprite
@@ -398,15 +409,9 @@ function spaces.Space:draw(gridX, gridY, scale, shadowOffsetX, shadowOffsetY, is
     
     
     -- Draws the sprite's decor
-    -- If the shadow offset is a pixel or greater, draw the shadowed decor.
-    if self.decorNum and shadowOffsetX >= scale then
-      spaces.decorSprite:draw(self.decorNum, x, y, scale)
-      
-    -- Otherwise, draw the shadowless decor.
-    elseif self.decorNum then
-      spaces.decorShadowlessSprite:draw(self.decorNum, x, y, scale)
+    if self.decorNum then
+      decorSheet:draw(self.decorNum, x, y, scale)
     end
-    
     
     -- If the space has exploding slime, draw it
     if self.exploding then
@@ -430,10 +435,12 @@ function spaces.Space:draw(gridX, gridY, scale, shadowOffsetX, shadowOffsetY, is
       spriteSheet = spaces.multiPadsHighlightSprite
       lillypadColor = graphics.COLOR_LILLYPAD_HIGHLIGHT
       lillypadShadowColor = graphics.COLOR_LILLYPAD_SHADOW_HIGHLIGHT
+      lillypadOutlineColor = graphics.COLOR_LILLYPAD_OUTLINE_HIGHLIGHT
     else
       spriteSheet = spaces.multiPadsSprite
       lillypadColor = graphics.COLOR_LILLYPAD
       lillypadShadowColor = graphics.COLOR_LILLYPAD_SHADOW
+      lillypadOutlineColor = graphics.COLOR_LILLYPAD_OUTLINE
     end
     
     -- Loop through every cell in this space
@@ -514,7 +521,7 @@ function spaces.Space:draw(gridX, gridY, scale, shadowOffsetX, shadowOffsetY, is
         
         shadowOffset = scale*2
         
-        love.graphics.setColor(graphics.COLOR_BLACK)
+        love.graphics.setColor(lillypadOutlineColor)
 
         -- Top left corner
         if left and up then
@@ -543,7 +550,7 @@ function spaces.Space:draw(gridX, gridY, scale, shadowOffsetX, shadowOffsetY, is
           end
         end
         
-        love.graphics.setColor(graphics.COLOR_BLACK)
+        love.graphics.setColor(lillypadOutlineColor)
         
         -- Top right corner
         if right and up then
@@ -576,7 +583,7 @@ function spaces.Space:draw(gridX, gridY, scale, shadowOffsetX, shadowOffsetY, is
           end
         end
         
-        love.graphics.setColor(graphics.COLOR_BLACK)
+        love.graphics.setColor(lillypadOutlineColor)
         
         -- Bottom right corner
         if right and down then
@@ -619,7 +626,7 @@ function spaces.Space:draw(gridX, gridY, scale, shadowOffsetX, shadowOffsetY, is
           end
         end
         
-        love.graphics.setColor(graphics.COLOR_BLACK)
+        love.graphics.setColor(lillypadOutlineColor)
         
         -- Bottom left corner
         if left and down then

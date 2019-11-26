@@ -23,7 +23,8 @@ function player.Player:new(startSpace)
     
     body = bodies.WarpBody:new(startSpace),
     
-    energy = 0,
+    energy = 50,
+    health = 5,
     
     eating = false,
     eatSpace = nil,  -- The space that the player is eating bugs from
@@ -163,6 +164,12 @@ function player.Player:eatBug(space)
   self.eatBody = space.occupiedBy
   self.body.moveDirection = direction
   self.animation = self.tongueBaseAnim
+end
+
+
+--- Hurts the player.
+function player.Player:hurt()
+  self.health = self.health - 1
 end
 
 

@@ -245,6 +245,14 @@ function bodies.WarpBody:moveTo(space, direction)
 end
 
 
+function bodies.WarpBody:isBesideBody(body)
+  if self.space.adjacentList[body.space] then
+    return true
+  end
+  return false
+end
+
+
 --- Adds a certain amount of fleas to the body.
 function bodies.WarpBody:addFleas(count)
   for i = 1, count do

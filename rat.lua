@@ -71,7 +71,8 @@ function rat.Rat:takeTurn(level, player)
   elseif self.moveTimer == 2 then
     
     -- If the rat is beside the player, hurt them
-    if self.body.space.distanceFromPlayer == 1 then
+    if self.body:isBesideBody(player.body) then
+      player:hurt()
       
     -- Otherwise, just move normally
     else

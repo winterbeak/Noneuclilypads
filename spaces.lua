@@ -462,28 +462,39 @@ function spaces.Space:draw(gridX, gridY, scale, shadowOffsetX, shadowOffsetY, is
         spriteNum = misc.toBits({left, up, right, down})
         
         -- Draws shadow
-        if not self:isCell(colNum + 1, rowNum + 1) then
-          love.graphics.setColor(graphics.COLOR_WATER_SHADOW)
+
+        love.graphics.setColor(graphics.COLOR_WATER_SHADOW)
+        
+        local shadowX = x + shadowOffsetX
+        local shadowY = y + shadowOffsetY
+        local shadowOffsetXPixels = shadowOffsetX / pixel
+        local shadowOffsetYPixels = shadowOffsetY / pixel
+        local leftCrop = 0
+        local upCrop = 0
+        local rightCrop = 0
+        local downCrop = 0
+        
+        -- If there's a lillypad below, only draw the right side of the shadow
+        if down then
+          leftCrop = spaces.singlePadsSprite.width - shadowOffsetXPixels - 2
           
-          local shadowX = x + shadowOffsetX
-          local shadowY = y + shadowOffsetY
-          local shadowOffsetXPixels = shadowOffsetX / pixel
-          local shadowOffsetYPixels = shadowOffsetY / pixel
-          local upCrop = 0
-          local leftCrop = 0
-          
-          -- If there's a lillypad below, only draw the right side of the shadow
-          if down then
-            leftCrop = spaces.singlePadsSprite.width - shadowOffsetXPixels - 2
+          if self:isCell(colNum + 1, rowNum + 1) then
+            downCrop = 2
           end
           
-          -- If there's a lillypad to the right, only draw the bottom of the shadow
-          if right then
-            upCrop = spaces.singlePadsSprite.singleHeight - shadowOffsetYPixels - 2
-          end
-          
-          spriteSheet:drawPartial(spriteNum, shadowX, shadowY, leftCrop, upCrop, 0, 0, scale)
         end
+        
+        -- If there's a lillypad to the right, only draw the bottom of the shadow
+        if right then
+          upCrop = spaces.singlePadsSprite.singleHeight - shadowOffsetYPixels - 2
+          
+          if self:isCell(colNum + 1, rowNum + 1) then
+            rightCrop = 2
+          end
+          
+        end
+          
+        spriteSheet:drawPartial(spriteNum, shadowX, shadowY, leftCrop, upCrop, rightCrop, downCrop, scale)
         
         -- Draws the sprite
         love.graphics.setColor(graphics.COLOR_WHITE)

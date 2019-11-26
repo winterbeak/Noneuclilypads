@@ -54,6 +54,112 @@ function grid.Grid:spaceAt(col, row)
 end
 
 
+--- Mirrors the top part of the grid to the bottom.
+function grid.Grid:dupeFlipDown()
+  local col
+  local row
+  local pointList
+  
+  local spacesList = {}
+  
+  -- Copies the list of spaces
+  for space, _ in pairs(self.spacesList) do
+    spacesList[space] = true
+  end
+  
+  -- Flips all of the spaces
+  for space, _ in pairs(spacesList) do
+    if space:isSingleCell() then
+      col, row = space:findACell()
+      self:addCellSpace(col, self.height - (row - 1))
+    else
+      pointList = {}
+      
+      for colNum, col in pairs(space.cells) do
+        for rowNum, _ in pairs(col) do
+          table.insert(pointList, {colNum, self.height - (rowNum - 1)})
+        end
+      end
+      
+      self:addSpace(pointList)
+    end
+  end
+  
+end
+
+
+--- Mirrors the left part of the grid to the right.
+function grid.Grid:dupeFlipRight()
+  local col
+  local row
+  local pointList
+  
+  local spacesList = {}
+  
+  -- Copies the list of spaces
+  for space, _ in pairs(self.spacesList) do
+    spacesList[space] = true
+  end
+  
+  -- Flips all of the spaces
+  for space, _ in pairs(spacesList) do
+    if space:isSingleCell() then
+      col, row = space:findACell()
+      self:addCellSpace(self.width - (col - 1), row)
+    else
+      pointList = {}
+      
+      for colNum, col in pairs(space.cells) do
+        for rowNum, _ in pairs(col) do
+          table.insert(pointList, {self.width - (colNum - 1), rowNum})
+        end
+      end
+      
+      self:addSpace(pointList)
+    end
+  end
+  
+end
+
+
+--- Adds a vertical line to the grid.
+function grid.Grid:addVertLine(col, row, height)
+  local pointList = {}
+  
+  for y = row, row + height - 1 do
+    table.insert(pointList, {col, y})
+  end
+  
+  self:addSpace(pointList)
+end
+
+
+--- Adds a horizontal line to the grid.
+function grid.Grid:addHorizLine(col, row, width)
+  local pointList = {}
+  
+  for x = col, col + width - 1 do
+    table.insert(pointList, {x, row})
+  end
+  
+  self:addSpace(pointList)
+end
+
+
+--- Adds a rectangular space to the grid.
+function grid.Grid:addRect(col, row, width, height)
+  local pointList = {}
+  
+  for x = col, col + width - 1 do
+    for y = row, row + height - 1 do
+      table.insert(pointList, {x, y})
+    end
+  end
+  
+  self:addSpace(pointList)
+end
+
+
 --- Deletes and recreates the adjacent spaces lists of the given space.
 -- The adjacent spaces lists are the four lists that keep track of what spaces
 -- are adjacent to the current space.  There is one list for each direction.
@@ -179,13 +285,13 @@ end
 
 
 --- Adds a multi-cell space to the grid.
--- pointList is a table of tables.  Each subtable be of the form {x=x, y=y}.
+-- pointList is a table of tables.  Each subtable must be of the form {1 = <x>, 2 = <y>}.
 -- Using vectors as a point is valid too.
 -- Make sure to refreshAllAdjacent() at some point after using this function
 -- to keep the adjacent lists updated properly.
 function grid.Grid:addSpace(pointList)
   
-  local newSpace = spaces.Space:new(pointList[1].x, pointList[1].y)
+  local newSpace = spaces.Space:new(pointList[1][1], pointList[1][2])
   
   local col
   local row
@@ -194,10 +300,10 @@ function grid.Grid:addSpace(pointList)
   
   -- Creates a list of spaces out of the pointList, to merge with the new space
   for index, point in pairs(pointList) do
-    spaceList[index] = spaces.Space:new(point.x, point.y)
-    
+    spaceList[index] = spaces.Space:new(point[1], point[2])
+
     -- Also adds the space to the spaces grid
-    self.spacesGrid[point.x][point.y] = newSpace
+    self.spacesGrid[point[1]][point[2]] = newSpace
   end
   
   -- Merges the cells of all the spaces with the space list
@@ -359,7 +465,7 @@ function grid.Grid:attemptSplit(space)
         -- points, so that they can be made into a new space
         self:deleteCell(colNum, rowNum)  
 
-        table.insert(pointList, {x = colNum, y = rowNum})
+        table.insert(pointList, {colNum, rowNum})
         
         allConnected = false
 
@@ -378,7 +484,7 @@ function grid.Grid:attemptSplit(space)
     -- the space is now three spaces: the left arm, right arm, and pole of the T.
     -- The possibility of more than two new spaces means that a recursive check
     -- is necessary to truly split the space.
-    newSpace = self.spacesGrid[pointList[1].x][pointList[1].y]
+    newSpace = self.spacesGrid[pointList[1][1]][pointList[1][2]]
     
     self:attemptSplit(newSpace)
     
@@ -450,6 +556,38 @@ function grid.Grid:addEnemy(enemy)
 end
 
 
+--- Randomly adds a certain amount of enemies to the level.
+function grid.Grid:populate(enemyCount)
+  local created = 0
+  local space
+  local enemy
+  
+  local rolls = 0
+  
+  while created < enemyCount do
+    
+    rolls = rolls + 1
+    if rolls == 100 then
+      print("Could only generate " .. created .. " enemies in this level!")
+      return
+    end
+    
+    space = misc.randomChoice(self.spacesList)
+    
+    if not space:isOccupied() then
+      enemy = entities.randomEnemy(space)
+      
+      if enemy then
+        self:addEnemy(enemy)
+        created = created + 1
+      end
+      
+    end
+    
+  end
+end
+
+
 --- Makes all the enemies in the level take their turn.
 function grid.Grid:doEnemyTurns(player)
   for enemy, _ in pairs(self.enemyList) do
@@ -494,8 +632,12 @@ function grid.Grid:updateDistances(space)
   searched[space] = true
   
   while #toSearch > 0 do
-
-    toSearch[1].distanceFromPlayer = distance
+    
+    if toSearch[1]:isOccupied() then
+      toSearch[1].distanceFromPlayer = 10000
+    else
+      toSearch[1].distanceFromPlayer = distance
+    end
     
     -- Visits all adjacent spaces
     for adjacentSpace, _ in pairs(toSearch[1].adjacentList) do

@@ -28,7 +28,7 @@ snake.Snake = {}
 function snake.Snake:new(spaceList, directionList)
   
   local newObj = {
-    moveTimer = 0,
+    moveTimer = math.random(0, 2),
     
     tailAnimation = nil,
     idleAnim1 = graphics.Animation:new(snake.tailWaggle1SpriteSheet),
@@ -43,6 +43,12 @@ function snake.Snake:new(spaceList, directionList)
     -- Stores direction of tail before a movement, so that during the movement it can be drawn properly
     previousTailDirection = nil
   }
+  
+  if newObj.moveTimer == 1 then
+    newObj.tailAnimation = newObj.idleAnim1
+  elseif newObj.moveTimer == 2 then
+    newObj.tailAnimation = newObj.idleAnim2
+  end
   
   newObj.idleAnim1:setFrameLength(6)
   newObj.idleAnim2:setFrameLength(4)
@@ -274,6 +280,19 @@ function snake.Snake:move(player)
 end
 
 
+--- Returns whether the snake can move to a given space.
+function snake.Snake:canMoveTo(space)
+  local restrictedDirection = misc.oppositeOf(self.bodyList[1].moveDirection)
+  for direction, spaceList in pairs(self.bodyList[1].space.adjacent) do
+    if direction ~= restrictedDirection then
+      if spaceList[space] then
+        return true
+      end
+    end
+  end
+end
+
+
 --- Makes the snake take a turn.
 -- Snakes always wait two turns, then move closer to the player.
 function snake.Snake:takeTurn(level, player)
@@ -292,7 +311,8 @@ function snake.Snake:takeTurn(level, player)
   elseif self.moveTimer == 3 then
     
     -- If the snake is beside the player, hurt them
-    if self.bodyList[1].space.distanceFromPlayer == 1 then
+    if self:canMoveTo(player.body.space) then
+      player:hurt()
       
     -- Otherwise, just move normally
     else

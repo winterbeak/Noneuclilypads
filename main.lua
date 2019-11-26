@@ -1,5 +1,8 @@
 -- The main code used to run the game.
 
+-- NOTE: There's a glitch with two slugs at once, if they merge the same cells, then multiple cells
+-- will be created and they will overlap
+
 gs = require("gs")
 misc = require("misc")
 grid = require("grid")
@@ -7,6 +10,7 @@ entities = require("entities")
 spaces = require("spaces")
 graphics = require("graphics")
 levelgen = require("levelgen")
+ui = require("ui")
 
 local gridXOffset = 150
 local gridYOffset = 50
@@ -97,13 +101,29 @@ function love.load()
   
   math.randomseed(os.time())
   
-  level = levelgen.testingLevel()
-  level:addEnemy(entities.Rat:new(level.spacesGrid[5][4]))
-  level:addEnemy(entities.Snake:newRandom(level.spacesGrid[5][5]))
-  --level:addEnemy(entities.Snake:newRandom(level.spacesGrid[6][7]))
-  level:addEnemy(entities.Slug:new(level.spacesGrid[7][1]))
+  level = levelgen.randomLevel()
   
-  player = entities.Player:new(level.spacesGrid[1][1])
+  -- Centers the level on the screen
+  gridXOffset = math.floor((love.graphics.getWidth() - (level.width * tileSize)) / 2)
+  gridYOffset = math.floor((love.graphics.getHeight() - (level.height * tileSize)) / 2)
+  
+  --level:addEnemy(entities.Rat:new(level.spacesGrid[5][4]))
+  --level:addEnemy(entities.Snake:newRandom(level.spacesGrid[5][5]))
+  --level:addEnemy(entities.Snake:newRandom(level.spacesGrid[6][7]))
+  --level:addEnemy(entities.Slug:new(level.spacesGrid[7][1]))
+  
+  local startSpace
+  while true do
+    space = misc.randomChoice(level.spacesList)
+    
+    if not space:isOccupied() then
+      player = entities.Player:new(space)
+      break
+    end
+    
+  end
+  
+  interface = ui.UI:new(player)
   
   level:updateDistances(player.body.space)
 
@@ -258,6 +278,9 @@ function love.draw()
   level:drawEnemies(gridXOffset, gridYOffset, pixel, tileSize)
   
   player:draw(gridXOffset + playerXOffset, gridYOffset + playerYOffset, pixel, tileSize)
+  
+  
+  interface:draw(pixel)
   
   
   -- FPS counter

@@ -109,7 +109,8 @@ function slug.Slug:takeTurn(level, player)
     self.animation = self.jumpAnims[self.moveTimer / 2]
 
     -- If the snail is beside the player, hurt them
-    if self.body.space.distanceFromPlayer == 1 then
+    if self.body:isBesideBody(player.body) then
+      player:hurt()
       
     -- Otherwise, just move normally
     else

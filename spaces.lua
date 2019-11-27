@@ -177,6 +177,26 @@ function spaces.Space:findACell()
 end
 
 
+--- Returns the coordinates of a random cell in the space.
+-- Returns two values: the first is the column number, and the second is the row number.
+function spaces.Space:randomCell()
+  
+  local colList = {}
+  local rowList = {}
+  
+  for colNum, col in pairs(self.cells) do
+    for rowNum, _ in pairs(col) do
+      table.insert(colList, colNum)
+      table.insert(rowList, rowNum)
+    end
+  end
+  
+  local choice = math.random(1, #colList)
+  return colList[choice], rowList[choice]
+
+end
+
+
 --- Returns whether the space occupies a cell at the given coordinates.
 function spaces.Space:isCell(col, row)
   

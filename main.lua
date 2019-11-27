@@ -3,7 +3,7 @@
 -- NOTE: There's a glitch with two slugs at once, if they merge the same cells, then multiple cells
 -- will be created and they will overlap
 
-gs = require("gs")
+movement = require("movement")
 misc = require("misc")
 grid = require("grid")
 entities = require("entities")
@@ -94,77 +94,37 @@ function updateMouse()
 end
 
 
---- Runs when the game is started.
-function love.load()
-  
-  -- gifMode()
-  
-  math.randomseed(os.time())
-  
-  level = levelgen.randomLevel()
-  
-  -- Centers the level on the screen
-  gridXOffset = math.floor((love.graphics.getWidth() - (level.width * tileSize)) / 2)
-  gridYOffset = math.floor((love.graphics.getHeight() - (level.height * tileSize)) / 2)
-  
-  --level:addEnemy(entities.Rat:new(level.spacesGrid[5][4]))
-  --level:addEnemy(entities.Snake:newRandom(level.spacesGrid[5][5]))
-  --level:addEnemy(entities.Snake:newRandom(level.spacesGrid[6][7]))
-  --level:addEnemy(entities.Slug:new(level.spacesGrid[7][1]))
-  
-  local startSpace
-  while true do
-    space = misc.randomChoice(level.spacesList)
-    
-    if not space:isOccupied() then
-      player = entities.Player:new(space)
-      break
-    end
-    
-  end
-  
-  interface = ui.UI:new(player)
-  
-  level:updateDistances(player.body.space)
-
-  lockMovement = false
-  
-  -- Keeps track of mouse events
-  mouseClicked = false
-  mouseHeld = false
-  mouseReleased = false
-  mouseDownPreviousFrame = false
-  
-  mouseSpace = nil
-  
-  -- Tracks fps
-  totalTime = 0
-  totalFrames = 0
-
+--- Prevents the player from moving for a certain amount of frames.
+function lockInput(frames)
+  lockMovement = true
+  turnDelayTimer = frames
 end
 
 
---- Runs every frame.
-function love.update(dt)
+function loadGameplay()
+  phase = GAMEPLAY
   
-  -- Draws fps
-  if showFPS then
-    totalTime = totalTime + dt
-    totalFrames = totalFrames + 1
+  playerLandingSpace.occupiedBy = player.body
+end
+
+
+function updateGameplay()
+
+  player:updateAnimation()
+  level:updateEnemies()
+  level:updateAllSpaces()
+  interface:update()
+  
+  -- Updates the input lock timer
+  if turnDelayTimer > 0 then
+    turnDelayTimer = turnDelayTimer - 1
+    
+    if turnDelayTimer <= 0 then
+      lockMovement = false
+    end
+  
   end
   
-  -- Updates mouse events
-  updateMouse()
-  mouseSpace = spaceAt(level, love.mouse.getX(), love.mouse.getY())
-  
-  -- Updates player animation
-  lockMovement = false -- change later
-  player:updateAnimation()
-  
-  -- Updates enemy animations
-  level:updateEnemies()
-  
-  level:updateAllSpaces()
   
   -- What happens when the mouse is clicked
   if not lockMovement and mouseReleased then
@@ -172,8 +132,13 @@ function love.update(dt)
     local validMove
     local eatFlies
     
-    if player.body.space.adjacentList[mouseSpace] then
+    -- If you click on the player's space, start the level transition
+    if mouseSpace.occupiedBy == player.body then
+      loadTakeoffCountdown()
+      
+    elseif player.body.space.adjacentList[mouseSpace] then
       if mouseSpace:isOccupied() then
+        
         if #mouseSpace.occupiedBy.bugs > 0 then
           validMove = true
           eatFlies = true
@@ -189,14 +154,15 @@ function love.update(dt)
     
     if validMove then
       
+      lockInput(TURN_DELAY)
+      
       -- Eats flies, if the space eaten from was valid
       if eatFlies then
         player:eatBug(mouseSpace)
       
       -- Move the player, if the move was valid
       else
-        lockMovement = true
-        
+
         for direction, spacesList in pairs(player.body.space.adjacent) do
           if spacesList[mouseSpace] then
             player:moveTo(mouseSpace, direction)
@@ -213,17 +179,14 @@ function love.update(dt)
     end
     
   end
-
+  
 end
 
 
---- Runs every frame.
-function love.draw()
+function drawGameplay()
   local highlighted
   local playerXOffset = 0
   local playerYOffset = 0
-  
-  love.graphics.setBackgroundColor(graphics.COLOR_WATER)
   
   -- level:drawDebug(gridXOffset, gridYOffset, tileSize)
   
@@ -273,15 +236,363 @@ function love.draw()
     
   end
   
-  level:drawDistances(gridXOffset, gridYOffset, tileSize)
+  -- level:drawDistances(gridXOffset, gridYOffset, tileSize)
+  level:drawEnemies(gridXOffset, gridYOffset, pixel, tileSize)
+  player:draw(gridXOffset + playerXOffset, gridYOffset + playerYOffset, pixel, tileSize)
+  interface:draw(pixel)
+end
+
+
+function loadTakeoffCountdown()
+  phase = TAKEOFF_COUNTDOWN
+  takeoffCountdownTimer = 0
+  takeoffWaitCount = 0
+end
+
+
+function updateTakeoffCountdown()
+  player:updateAnimation()
+  level:updateEnemies()
+  level:updateAllSpaces()
+  interface:update()
+  
+  takeoffCountdownTimer = takeoffCountdownTimer + 1
+  
+  if takeoffCountdownTimer == 60 then
+    takeoffCountdownTimer = 0
+    takeoffWaitCount = takeoffWaitCount + 1
+    
+    if takeoffWaitCount == 3 then
+      loadTakeoff()
+    else
+      level:doEnemyTurns(player)
+    end
+    
+  end
+  
+end
+
+
+function drawTakeoffCountdown()
+  for space, _ in pairs(level.spacesList) do
+    space:draw(gridXOffset, gridYOffset, pixel, pixel*2, pixel*2, highlighted)
+  end
   
   level:drawEnemies(gridXOffset, gridYOffset, pixel, tileSize)
-  
-  player:draw(gridXOffset + playerXOffset, gridYOffset + playerYOffset, pixel, tileSize)
-  
-  
+  player:draw(gridXOffset, gridYOffset, pixel, tileSize)
   interface:draw(pixel)
+end
+
+
+function loadTakeoff()
+  phase = TAKEOFF
+  takeoffFrame = 0
+  playerTransitionX = gridXOffset
+  playerTransitionY = gridYOffset
+  player.moveDirection = "up"
+
+  local first = gridYOffset
+  local last = love.graphics.getHeight()
+  local length = TAKEOFF_LEVEL_DOWN_LENGTH
+  levelDownMovement = movement.Sine:newFadeIn(first, last, length)
+end
+
+
+function updateTakeoff()
   
+  takeoffFrame = takeoffFrame + 1
+  
+  -- Gives the player a new single-celled space so that only one copy is drawn
+  if takeoffFrame == 3 then 
+    local col, row = player.body.space:randomCell()
+    player.body.space = spaces.Space:new(col, row, 1, 1)
+    
+  -- Sets the player's space to the top left of the grid so that we can draw them at certain locations
+  elseif takeoffFrame == TAKEOFF_LEVEL_DOWN_FRAME then
+    player.body.space = spaces.Space:new(1, 1, 1, 1)
+    playerTransitionX = pixel * 50
+    
+  end
+  
+  if takeoffFrame < TAKEOFF_WAIT_FRAME then
+    level:updateEnemies()
+    playerTransitionY = playerTransitionY - (pixel * 10)
+    
+  elseif takeoffFrame < TAKEOFF_LEVEL_DOWN_FRAME then
+    level:updateEnemies()
+    gridYOffset = levelDownMovement:valueAt(takeoffFrame - TAKEOFF_WAIT_FRAME)
+    
+  elseif takeoffFrame < TAKEOFF_PLAYER_CATCHUP_FRAME then
+    playerTransitionY = playerTransitionY + (pixel * 5)
+    
+  elseif takeoffFrame < TAKEOFF_DAYS_UNTIL_FRAME then
+    playerTransitionY = playerTransitionY + (pixel / 2)
+    
+  elseif takeoffFrame < TAKEOFF_PLAYER_DOWN_FRAME then
+    playerTransitionY = playerTransitionY + (pixel * 5)
+    
+  else
+    loadChooseSpace()
+  end
+  
+end
+
+
+function drawTakeoff()
+  if takeoffFrame < TAKEOFF_LEVEL_DOWN_FRAME then
+    for space, _ in pairs(level.spacesList) do
+      space:draw(gridXOffset, gridYOffset, pixel, pixel*2, pixel*2, highlighted)
+    end
+    
+    level:drawEnemies(gridXOffset, gridYOffset, pixel, tileSize)
+  end
+  
+  player:draw(playerTransitionX, playerTransitionY, pixel, tileSize)
+  interface:draw(pixel)
+end
+
+
+function loadChooseSpace()
+  phase = CHOOSE_SPACE
+  
+  level = levelgen.randomLevel()
+  
+  local first = -love.graphics.getHeight()
+  local last = math.floor((love.graphics.getHeight() - (level.height * tileSize)) / 2)
+  local length = LANDING_LEVEL_DOWN_LENGTH
+  
+  levelDownMovement = movement.Sine:newFadeOut(first, last, length)
+  
+  movementFrame = 0
+  
+  gridXOffset = math.floor((love.graphics.getWidth() - (level.width * tileSize)) / 2)
+  gridYOffset = first
+  
+  spaceChosen = false
+  
+  playerLandingSpace = nil
+  playerMovement = nil
+end
+
+
+function updateChooseSpace()
+  player:updateAnimation()
+  level:updateEnemies()
+  level:updateAllSpaces()
+  interface:update()
+  
+  
+  if movementFrame < LAST_LEVEL_MOVEMENT_FRAME then
+    movementFrame = movementFrame + 1
+    
+    if movementFrame < LANDING_WAIT_FRAME then
+      
+    elseif movementFrame < LANDING_LEVEL_DOWN_FRAME then
+      gridYOffset = levelDownMovement:valueAt(movementFrame - LANDING_WAIT_FRAME)
+    else
+      gridYOffset = levelDownMovement.last
+    end
+  end
+  
+  if playerMovement then
+    if playerMovement.frame <= playerMovement.length then
+      playerMovement.frame = playerMovement.frame + 1
+      
+      playerTransitionY = playerMovement:valueAt(playerMovement.frame)
+      print(playerTransitionY)
+      if playerMovement.frame == playerMovement.length - 3 then
+        player.body.space = playerLandingSpace
+        
+      elseif playerMovement.frame == playerMovement.length then
+        loadGameplay()
+      end
+    end
+  end
+  
+  
+  if mouseReleased then
+    
+    if not mouseSpace:isOccupied() then
+      playerLandingSpace = mouseSpace
+      
+      local col
+      local row
+      col, row = playerLandingSpace:randomCell()
+      player.body.space = spaces.Space:new(col, row, 1, 1)
+      spaceChosen = true
+      
+      local first = love.graphics.getHeight()
+      local last = gridYOffset
+      
+      playerMovement = movement.Linear:new(first, last, 30)
+      
+      playerTransitionX = gridXOffset
+    end
+    
+  end
+end
+
+
+function drawChooseSpace()
+  local highlighted
+
+  for space, _ in pairs(level.spacesList) do
+    if space:isOccupied() then
+      highlighted = false
+    else
+      highlighted = true
+    end
+    
+    
+    -- "Compresses" a space if the mouse is hovering over it.
+    if highlighted and space == mouseSpace then
+      
+      -- If the mouse is being held, compress it more
+      if mouseHeld then
+        space:draw(gridXOffset + pixel*2, gridYOffset + pixel*2, pixel, 0, 0, highlighted)
+        
+      -- Otherwise, compress it the normal amount
+      else
+        space:draw(gridXOffset + pixel, gridYOffset + pixel, pixel, pixel, pixel, highlighted)
+        
+      end
+      
+    -- Otherwise, draws the space normally
+    else
+      space:draw(gridXOffset, gridYOffset, pixel, pixel*2, pixel*2, highlighted)
+    end
+    
+  end
+
+  level:drawEnemies(gridXOffset, gridYOffset, pixel, tileSize)
+  player:draw(playerTransitionX, playerTransitionY, pixel, tileSize)
+  interface:draw(pixel)
+end
+
+
+
+--- Runs when the game is started.
+function love.load()
+  math.randomseed(os.time())
+  
+  -- gifMode()
+  
+  love.graphics.setBackgroundColor(graphics.COLOR_WATER)
+  
+  GAMEPLAY = 0
+  TAKEOFF_COUNTDOWN = 1
+  TAKEOFF = 2
+  CHOOSE_SPACE = 3
+  phase = GAMEPLAY
+  
+  TURN_DELAY = 30  -- Amount of frames that movement is locked for after a move
+  turnDelayTimer = 0
+
+  level = levelgen.randomLevel()
+  
+  takeoffCountdownTimer = 0
+  takeoffWaitCount = 0
+  playerTransitionX = 0
+  playerTransitionY = 0
+  TAKEOFF_WAIT_LENGTH = 30
+  TAKEOFF_LEVEL_DOWN_LENGTH = 45
+  TAKEOFF_PLAYER_CATCHUP_LENGTH = 55
+  TAKEOFF_DAYS_UNTIL_LENGTH = 300
+  TAKEOFF_PLAYER_DOWN_LENGTH = 15
+  
+  TAKEOFF_WAIT_FRAME = TAKEOFF_WAIT_LENGTH
+  TAKEOFF_LEVEL_DOWN_FRAME = TAKEOFF_WAIT_FRAME + TAKEOFF_LEVEL_DOWN_LENGTH
+  TAKEOFF_PLAYER_CATCHUP_FRAME = TAKEOFF_LEVEL_DOWN_FRAME + TAKEOFF_PLAYER_CATCHUP_LENGTH
+  TAKEOFF_DAYS_UNTIL_FRAME = TAKEOFF_PLAYER_CATCHUP_FRAME + TAKEOFF_DAYS_UNTIL_LENGTH
+  TAKEOFF_PLAYER_DOWN_FRAME = TAKEOFF_DAYS_UNTIL_FRAME + TAKEOFF_PLAYER_DOWN_LENGTH
+  
+  LANDING_WAIT_LENGTH = 30
+  LANDING_LEVEL_DOWN_LENGTH = 60
+  
+  LANDING_WAIT_FRAME = LANDING_WAIT_LENGTH
+  LANDING_LEVEL_DOWN_FRAME = LANDING_WAIT_FRAME + LANDING_LEVEL_DOWN_LENGTH
+  LAST_LEVEL_MOVEMENT_FRAME = LANDING_LEVEL_DOWN_FRAME
+  
+  -- Centers the level on the screen
+  gridXOffset = math.floor((love.graphics.getWidth() - (level.width * tileSize)) / 2)
+  gridYOffset = math.floor((love.graphics.getHeight() - (level.height * tileSize)) / 2)
+  
+  --level:addEnemy(entities.Rat:new(level.spacesGrid[5][4]))
+  --level:addEnemy(entities.Snake:newRandom(level.spacesGrid[5][5]))
+  --level:addEnemy(entities.Snake:newRandom(level.spacesGrid[6][7]))
+  --level:addEnemy(entities.Slug:new(level.spacesGrid[7][1]))
+  
+  local startSpace
+  while true do
+    space = misc.randomChoice(level.spacesList)
+    
+    if not space:isOccupied() then
+      player = entities.Player:new(space)
+      break
+    end
+    
+  end
+  
+  interface = ui.UI:new(player)
+  ui.updateScreenSize(pixel)
+  
+  level:updateDistances(player.body.space)
+
+  lockMovement = false
+  
+  -- Keeps track of mouse events
+  mouseClicked = false
+  mouseHeld = false
+  mouseReleased = false
+  mouseDownPreviousFrame = false
+  
+  mouseSpace = nil
+  
+  -- Tracks fps
+  totalTime = 0
+  totalFrames = 0
+
+end
+
+
+--- Runs every frame.
+function love.update(dt)
+  
+  -- Updates fps
+  if showFPS then
+    totalTime = totalTime + dt
+    totalFrames = totalFrames + 1
+  end
+  
+  -- Updates mouse events
+  updateMouse()
+  mouseSpace = spaceAt(level, love.mouse.getX(), love.mouse.getY())
+  
+  if phase == GAMEPLAY then
+    updateGameplay()
+  elseif phase == TAKEOFF_COUNTDOWN then
+    updateTakeoffCountdown()
+  elseif phase == TAKEOFF then
+    updateTakeoff()
+  elseif phase == CHOOSE_SPACE then
+    updateChooseSpace()
+  end
+
+end
+
+
+--- Runs every frame.
+function love.draw()
+  
+  if phase == GAMEPLAY then
+    drawGameplay()
+  elseif phase == TAKEOFF_COUNTDOWN then
+    drawTakeoffCountdown()
+  elseif phase == TAKEOFF then
+    drawTakeoff()
+  elseif phase == CHOOSE_SPACE then
+    drawChooseSpace()
+  end
   
   -- FPS counter
   if showFPS then

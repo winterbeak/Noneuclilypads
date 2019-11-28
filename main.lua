@@ -16,7 +16,10 @@ local gridXOffset = 150
 local gridYOffset = 50
 local pixel = 3
 local tileSize = (pixel * spaces.singlePadsSprite.width)
-local showFPS = true
+local showFPS = false
+
+local daysFont = love.graphics.newFont("m6x11.ttf", 128)
+local winterFont = love.graphics.newFont("m6x11.ttf", 32)
 
 
 --- Changes a few settings for gif recording.
@@ -72,6 +75,29 @@ function drawDebugCell(r, g, b, col, row)
 end
 
 
+function drawDaysLeft(x, y)
+  local dayString
+  
+  local winterX
+  local winterY
+  
+  if daysLeft == 1 then
+    dayString = " DAY"
+  else
+    dayString = " DAYS"
+  end
+  
+  winterX = (daysFont:getWidth(daysLeft .. dayString) - winterFont:getWidth("LEFT UNTIL WINTER")) / 2
+  winterX = math.floor(winterX) + x
+  winterY = y + pixel * 34
+  
+  love.graphics.setFont(daysFont)
+  love.graphics.print(daysLeft .. dayString, x, y)
+  love.graphics.setFont(winterFont)
+  love.graphics.print("LEFT UNTIL WINTER", winterX, winterY)
+end
+
+
 function updateMouse()
   if love.mouse.isDown(1) then
     if not mouseHeld then
@@ -103,8 +129,6 @@ end
 
 function loadGameplay()
   phase = GAMEPLAY
-  
-  playerLandingSpace.occupiedBy = player.body
 end
 
 
@@ -127,7 +151,7 @@ function updateGameplay()
   
   
   -- What happens when the mouse is clicked
-  if not lockMovement and mouseReleased then
+  if not lockMovement and mouseReleased and mouseSpace then
     
     local validMove
     local eatFlies
@@ -240,6 +264,7 @@ function drawGameplay()
   level:drawEnemies(gridXOffset, gridYOffset, pixel, tileSize)
   player:draw(gridXOffset + playerXOffset, gridYOffset + playerYOffset, pixel, tileSize)
   interface:draw(pixel)
+  
 end
 
 
@@ -247,6 +272,12 @@ function loadTakeoffCountdown()
   phase = TAKEOFF_COUNTDOWN
   takeoffCountdownTimer = 0
   takeoffWaitCount = 0
+  
+  player.body.moveDirection = "up"
+  player.readyingLeap = true
+  player:nextLeapReadyAnim()
+  
+
 end
 
 
@@ -258,7 +289,7 @@ function updateTakeoffCountdown()
   
   takeoffCountdownTimer = takeoffCountdownTimer + 1
   
-  if takeoffCountdownTimer == 60 then
+  if takeoffCountdownTimer == TAKEOFF_COUNTDOWN_WAIT_LENGTH then
     takeoffCountdownTimer = 0
     takeoffWaitCount = takeoffWaitCount + 1
     
@@ -266,6 +297,7 @@ function updateTakeoffCountdown()
       loadTakeoff()
     else
       level:doEnemyTurns(player)
+      player:nextLeapReadyAnim()
     end
     
   end
@@ -289,16 +321,29 @@ function loadTakeoff()
   takeoffFrame = 0
   playerTransitionX = gridXOffset
   playerTransitionY = gridYOffset
-  player.moveDirection = "up"
 
   local first = gridYOffset
   local last = love.graphics.getHeight()
   local length = TAKEOFF_LEVEL_DOWN_LENGTH
   levelDownMovement = movement.Sine:newFadeIn(first, last, length)
+  
+  player.animation = player.leapAnim
+  player.readyingLeap = false
+  player.inLeap = true
+  
+  daysLeft = daysLeft - 1
+  daysLeftAlpha = 0
+  daysLeftY = pixel * 54
+  
+  TAKEOFF_LEFT = 1
+  TAKEOFF_RIGHT = 2
+  takeoffVariant = math.random(1, 2)
 end
 
 
 function updateTakeoff()
+  
+  player:updateAnimation()
   
   takeoffFrame = takeoffFrame + 1
   
@@ -310,13 +355,22 @@ function updateTakeoff()
   -- Sets the player's space to the top left of the grid so that we can draw them at certain locations
   elseif takeoffFrame == TAKEOFF_LEVEL_DOWN_FRAME then
     player.body.space = spaces.Space:new(1, 1, 1, 1)
-    playerTransitionX = pixel * 50
+    
+    if takeoffVariant == TAKEOFF_LEFT then
+      playerTransitionX = pixel * 50
+    elseif takeoffVariant == TAKEOFF_RIGHT then
+      playerTransitionX = pixel * 196
+    end
+    
+    playerTransitionY = -pixel * 280
     
   end
   
   if takeoffFrame < TAKEOFF_WAIT_FRAME then
     level:updateEnemies()
-    playerTransitionY = playerTransitionY - (pixel * 10)
+    if player.animation ~= player.leapAnim or player.animation.frame >= 3 then
+      playerTransitionY = playerTransitionY - (pixel * 10)
+    end
     
   elseif takeoffFrame < TAKEOFF_LEVEL_DOWN_FRAME then
     level:updateEnemies()
@@ -327,6 +381,29 @@ function updateTakeoff()
     
   elseif takeoffFrame < TAKEOFF_DAYS_UNTIL_FRAME then
     playerTransitionY = playerTransitionY + (pixel / 2)
+    daysLeftY = daysLeftY + (pixel / 8)
+    
+    -- Fades in text
+    if takeoffFrame >= TAKEOFF_TEXT_FADE_IN_FRAME and takeoffFrame < TAKEOFF_TEXT_FADE_OUT_FRAME then
+      if daysLeftAlpha < 1 then
+        daysLeftAlpha = daysLeftAlpha + 0.012
+        
+        if daysLeftAlpha > 1 then
+          daysLeftAlpha = 1
+        end
+      end
+    
+    -- Fades out text
+    elseif takeoffFrame >= TAKEOFF_TEXT_FADE_OUT_FRAME then
+      if daysLeftAlpha > 0 then
+        daysLeftAlpha = daysLeftAlpha - 0.012
+        
+        if daysLeftAlpha < 0 then
+          daysLeftAlpha = 0
+        end
+      end
+      
+    end
     
   elseif takeoffFrame < TAKEOFF_PLAYER_DOWN_FRAME then
     playerTransitionY = playerTransitionY + (pixel * 5)
@@ -339,16 +416,49 @@ end
 
 
 function drawTakeoff()
+  local playerX = playerTransitionX
+  local playerY = playerTransitionY
+  
   if takeoffFrame < TAKEOFF_LEVEL_DOWN_FRAME then
     for space, _ in pairs(level.spacesList) do
       space:draw(gridXOffset, gridYOffset, pixel, pixel*2, pixel*2, highlighted)
     end
     
     level:drawEnemies(gridXOffset, gridYOffset, pixel, tileSize)
+    
+  elseif takeoffFrame < TAKEOFF_PLAYER_DOWN_FRAME then
+    
+    if math.random(1, 4) == 1 then
+      playerX = playerX + math.random(-2, -2)
+      playerY = playerY + math.random(-2, -2)
+    end
   end
   
-  player:draw(playerTransitionX, playerTransitionY, pixel, tileSize)
+  player:draw(playerX, playerY, pixel, tileSize)
   interface:draw(pixel)
+  
+  -- Draws the days left text
+  if takeoffFrame >= TAKEOFF_LEVEL_DOWN_FRAME and takeoffFrame < TAKEOFF_PLAYER_DOWN_FRAME then
+    
+    local textColor = {}
+    for i = 1, 3 do
+      textColor[i] = DAYS_LEFT_COLOR[i]
+    end
+    textColor[4] = daysLeftAlpha
+    love.graphics.setColor(textColor)
+    
+    -- Variant where the player is on the left and the text is on the right
+    if takeoffVariant == TAKEOFF_LEFT then
+      drawDaysLeft(pixel * 100, math.floor(daysLeftY))
+      
+    -- Variant where the player is on the right and the text is on the left
+    elseif takeoffVariant == TAKEOFF_RIGHT then
+      drawDaysLeft(pixel * 58, math.floor(daysLeftY))
+    end
+    
+    love.graphics.setColor(graphics.COLOR_WHITE)
+  end
+  
 end
 
 
@@ -372,6 +482,7 @@ function loadChooseSpace()
   
   playerLandingSpace = nil
   playerMovement = nil
+  player.flailing = false
 end
 
 
@@ -399,18 +510,21 @@ function updateChooseSpace()
       playerMovement.frame = playerMovement.frame + 1
       
       playerTransitionY = playerMovement:valueAt(playerMovement.frame)
-      print(playerTransitionY)
+      
       if playerMovement.frame == playerMovement.length - 3 then
         player.body.space = playerLandingSpace
         
       elseif playerMovement.frame == playerMovement.length then
+        playerLandingSpace.occupiedBy = player.body
+        player.animation = player.leapLandingAnim
+        player.landing = true
+        lockInput(TURN_DELAY)
         loadGameplay()
       end
     end
-  end
   
-  
-  if mouseReleased then
+  -- After a space is chosen, prepare the player for landing
+  elseif not (movementFrame < LAST_LEVEL_MOVEMENT_FRAME) and mouseReleased and mouseSpace then
     
     if not mouseSpace:isOccupied() then
       playerLandingSpace = mouseSpace
@@ -424,9 +538,13 @@ function updateChooseSpace()
       local first = love.graphics.getHeight()
       local last = gridYOffset
       
-      playerMovement = movement.Linear:new(first, last, 30)
+      playerMovement = movement.Linear:new(first, last, 20)
+      
+      player.animation = player.leapLandingAnim
       
       playerTransitionX = gridXOffset
+      
+      level:doEnemyTurns(player)
     end
     
   end
@@ -437,10 +555,10 @@ function drawChooseSpace()
   local highlighted
 
   for space, _ in pairs(level.spacesList) do
-    if space:isOccupied() then
-      highlighted = false
-    else
+    if space == mouseSpace and not space:isOccupied() then
       highlighted = true
+    else
+      highlighted = false
     end
     
     
@@ -485,7 +603,7 @@ function love.load()
   CHOOSE_SPACE = 3
   phase = GAMEPLAY
   
-  TURN_DELAY = 30  -- Amount of frames that movement is locked for after a move
+  TURN_DELAY = 24  -- Amount of frames that movement is locked for after a move
   turnDelayTimer = 0
 
   level = levelgen.randomLevel()
@@ -494,10 +612,12 @@ function love.load()
   takeoffWaitCount = 0
   playerTransitionX = 0
   playerTransitionY = 0
-  TAKEOFF_WAIT_LENGTH = 30
+  TAKEOFF_COUNTDOWN_WAIT_LENGTH = 90
+  
+  TAKEOFF_WAIT_LENGTH = 36
   TAKEOFF_LEVEL_DOWN_LENGTH = 45
   TAKEOFF_PLAYER_CATCHUP_LENGTH = 55
-  TAKEOFF_DAYS_UNTIL_LENGTH = 300
+  TAKEOFF_DAYS_UNTIL_LENGTH = 360
   TAKEOFF_PLAYER_DOWN_LENGTH = 15
   
   TAKEOFF_WAIT_FRAME = TAKEOFF_WAIT_LENGTH
@@ -505,6 +625,11 @@ function love.load()
   TAKEOFF_PLAYER_CATCHUP_FRAME = TAKEOFF_LEVEL_DOWN_FRAME + TAKEOFF_PLAYER_CATCHUP_LENGTH
   TAKEOFF_DAYS_UNTIL_FRAME = TAKEOFF_PLAYER_CATCHUP_FRAME + TAKEOFF_DAYS_UNTIL_LENGTH
   TAKEOFF_PLAYER_DOWN_FRAME = TAKEOFF_DAYS_UNTIL_FRAME + TAKEOFF_PLAYER_DOWN_LENGTH
+  
+  TAKEOFF_TEXT_FADE_IN_FRAME = TAKEOFF_PLAYER_CATCHUP_FRAME + 20
+  TAKEOFF_TEXT_FADE_OUT_FRAME = TAKEOFF_DAYS_UNTIL_FRAME - 90
+  
+  DAYS_LEFT_COLOR = graphics.convertColor({207, 254, 208})
   
   LANDING_WAIT_LENGTH = 30
   LANDING_LEVEL_DOWN_LENGTH = 60
@@ -547,6 +672,9 @@ function love.load()
   mouseDownPreviousFrame = false
   
   mouseSpace = nil
+  
+  -- Days until winter
+  daysLeft = 7
   
   -- Tracks fps
   totalTime = 0

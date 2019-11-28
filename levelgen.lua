@@ -29,6 +29,7 @@ function levelgen.testingLevel()
   level:mergeCoordinates(6, 3, 6, 4)
 
   level:refreshAllAdjacent()
+  level:populate(3)
   
   return level
   

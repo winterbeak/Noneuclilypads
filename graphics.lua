@@ -305,13 +305,22 @@ end
 -- Does not apply delays between frames.
 -- Sets the onLastFrame flag once the animation reaches its last frame.
 function graphics.Animation:nextFrame()
-  if self.onLastFrame then
-    self.isDone = true
-  end
   
-  self.frame = self.frame + 1
-  if self.frame == self.spriteSheet.spriteCount then
-    self.onLastFrame = true
+  -- Don't update anything if the animation is done
+  if not self.isDone then
+    
+    if self.onLastFrame then
+      self.isDone = true
+      
+    else
+      self.frame = self.frame + 1
+      
+      -- If you increment to after the final frame, set the animation to done
+      if self.frame == self.spriteSheet.spriteCount then
+        self.onLastFrame = true
+      end
+    end
+    
   end
 end
 
@@ -328,18 +337,22 @@ end
 --- Updates the animation, including delaying the proper amount of time between frames.
 function graphics.Animation:update()
   
-  -- If the animation has frame lengths, delay before switching to the next frame
-  if self.hasFrameLengths then
-    self.delayCount = self.delayCount + 1
+  -- If the animation hasn't ended yet
+  if not self.isDone then
     
-    if self.delayCount >= self.frameLengths[self.frame] then
+    -- If the animation has frame lengths, delay before switching to the next frame
+    if self.hasFrameLengths then
+      self.delayCount = self.delayCount + 1
+      
+      if self.delayCount >= self.frameLengths[self.frame] then
+        self:nextFrame()
+        self.delayCount = 0
+      end
+    
+    -- Otherwise, each frame defaults to length 1, so just switch it immediately each frame
+    else
       self:nextFrame()
-      self.delayCount = 0
     end
-  
-  -- Otherwise, each frame defaults to length 1, so just switch it immediately each frame
-  else
-    self:nextFrame()
   end
 end
 

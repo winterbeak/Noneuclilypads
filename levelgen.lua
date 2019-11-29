@@ -116,6 +116,47 @@ function levelgen.snakeTest2()
 end
 
 
+--- Randomly chooses whether to add a space at the given coordinates.
+-- Numerator and denominator represent the chance that the space is added.
+-- Ex. if numerator = 2, denominator = 3, then the chance that a space is added is 2/3.
+function chanceAdd(level, numerator, denominator, x, y)
+  if math.random(1, denominator) <= numerator then
+    level:addCellSpace(x, y)
+  end
+end
+
+
+--- The level that the frog lands on to hibernate.
+function levelgen.winterLevel()
+  local level = grid.Grid:new(5, 5)
+  
+  -- Center plus
+  level:addCellSpace(3, 3)
+  level:addCellSpace(2, 3)
+  level:addCellSpace(3, 2)
+  level:addCellSpace(4, 3)
+  level:addCellSpace(3, 4)
+  
+  -- Corners
+  chanceAdd(level, 3, 4, 2, 2)
+  chanceAdd(level, 3, 4, 2, 4)
+  chanceAdd(level, 3, 4, 4, 2)
+  chanceAdd(level, 3, 4, 4, 4)
+  
+  -- Extended plus
+  chanceAdd(level, 1, 4, 1, 3)
+  chanceAdd(level, 1, 4, 3, 1)
+  chanceAdd(level, 1, 4, 5, 3)
+  chanceAdd(level, 1, 4, 3, 5)
+  
+  level:refreshAllAdjacent()
+  
+  return level
+  
+end
+
+
+
 function levelgen.windowsill()
   local vertBarThickness = math.random(2, 3)
   local horizBarThickness = math.random(2, 3)

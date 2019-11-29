@@ -12,14 +12,77 @@ graphics = require("graphics")
 levelgen = require("levelgen")
 ui = require("ui")
 
-local gridXOffset = 150
-local gridYOffset = 50
-local pixel = 3
-local tileSize = (pixel * spaces.singlePadsSprite.width)
-local showFPS = false
 
-local daysFont = love.graphics.newFont("m6x11.ttf", 128)
-local winterFont = love.graphics.newFont("m6x11.ttf", 32)
+GAMEPLAY = 0
+TAKEOFF_COUNTDOWN = 1
+TAKEOFF = 2
+CHOOSE_SPACE = 3
+WINTER = 4
+phase = GAMEPLAY
+
+TURN_DELAY = 24  -- Amount of frames that movement is locked for after a move
+turnDelayTimer = 0
+
+
+takeoffCountdownTimer = 0
+takeoffWaitCount = 0
+playerTransitionX = 0
+playerTransitionY = 0
+TAKEOFF_COUNTDOWN_WAIT_LENGTH = 90
+
+TAKEOFF_WAIT_LENGTH = 36
+TAKEOFF_LEVEL_DOWN_LENGTH = 45
+TAKEOFF_PLAYER_CATCHUP_LENGTH = 55
+TAKEOFF_DAYS_UNTIL_LENGTH = 300
+TAKEOFF_PLAYER_DOWN_LENGTH = 15
+
+TAKEOFF_WAIT_FRAME = TAKEOFF_WAIT_LENGTH
+TAKEOFF_LEVEL_DOWN_FRAME = TAKEOFF_WAIT_FRAME + TAKEOFF_LEVEL_DOWN_LENGTH
+TAKEOFF_PLAYER_CATCHUP_FRAME = TAKEOFF_LEVEL_DOWN_FRAME + TAKEOFF_PLAYER_CATCHUP_LENGTH
+TAKEOFF_DAYS_UNTIL_FRAME = TAKEOFF_PLAYER_CATCHUP_FRAME + TAKEOFF_DAYS_UNTIL_LENGTH
+TAKEOFF_PLAYER_DOWN_FRAME = TAKEOFF_DAYS_UNTIL_FRAME + TAKEOFF_PLAYER_DOWN_LENGTH
+
+TAKEOFF_TEXT_FADE_IN_FRAME = TAKEOFF_PLAYER_CATCHUP_FRAME + 20
+TAKEOFF_TEXT_FADE_OUT_FRAME = TAKEOFF_DAYS_UNTIL_FRAME - 90
+
+DAYS_LEFT_COLOR = graphics.convertColor({220, 255, 235})
+  
+LANDING_WAIT_LENGTH = 30
+LANDING_LEVEL_DOWN_LENGTH = 60
+
+LANDING_WAIT_FRAME = LANDING_WAIT_LENGTH
+LANDING_LEVEL_DOWN_FRAME = LANDING_WAIT_FRAME + LANDING_LEVEL_DOWN_LENGTH
+LAST_LEVEL_MOVEMENT_FRAME = LANDING_LEVEL_DOWN_FRAME
+
+FREEZE_COLOR = graphics.convertColor({43, 253, 253, 75})
+iceWall = graphics.SpriteSheet:new("iceWall.png", 1)
+
+
+gridXOffset = 150
+gridYOffset = 50
+pixel = 3
+tileSize = (pixel * spaces.singlePadsSprite.width)
+showFPS = false
+
+daysFont = love.graphics.newFont("m6x11.ttf", 48 * pixel)
+winterFont = love.graphics.newFont("m6x11.ttf", 16 * pixel)
+
+lockMovement = false
+  
+-- Keeps track of mouse events
+mouseClicked = false
+mouseHeld = false
+mouseReleased = false
+mouseDownPreviousFrame = false
+
+mouseSpace = nil
+
+
+daysLeft = 1  -- Days until winter
+
+interface = nil  -- UI
+player = nil  -- Player object
+level = nil  -- Level grid object
 
 
 --- Changes a few settings for gif recording.
@@ -89,7 +152,7 @@ function drawDaysLeft(x, y)
   
   winterX = (daysFont:getWidth(daysLeft .. dayString) - winterFont:getWidth("LEFT UNTIL WINTER")) / 2
   winterX = math.floor(winterX) + x
-  winterY = y + pixel * 34
+  winterY = y + pixel * 42
   
   love.graphics.setFont(daysFont)
   love.graphics.print(daysLeft .. dayString, x, y)
@@ -220,7 +283,7 @@ function drawGameplay()
     if space.occupiedBy == player.body then
       highlighted = true
       
-    else
+    elseif not (space:isOccupied() and (#space.occupiedBy.bugs <= 0)) then
       for adjacentSpace, _ in pairs(space.adjacentList) do
         if adjacentSpace.occupiedBy == player.body then
           highlighted = true
@@ -348,7 +411,7 @@ function updateTakeoff()
   takeoffFrame = takeoffFrame + 1
   
   -- Gives the player a new single-celled space so that only one copy is drawn
-  if takeoffFrame == 3 then 
+  if player.leapAnim and player.animation.frame == 3 and player.animation.delayCount == 0 then 
     local col, row = player.body.space:randomCell()
     player.body.space = spaces.Space:new(col, row, 1, 1)
     
@@ -362,7 +425,7 @@ function updateTakeoff()
       playerTransitionX = pixel * 196
     end
     
-    playerTransitionY = -pixel * 280
+    playerTransitionY = -pixel * 270
     
   end
   
@@ -409,7 +472,11 @@ function updateTakeoff()
     playerTransitionY = playerTransitionY + (pixel * 5)
     
   else
-    loadChooseSpace()
+    if daysLeft > 0 then
+      loadChooseSpace()
+    else
+      loadWinter()
+    end
   end
   
 end
@@ -505,25 +572,30 @@ function updateChooseSpace()
     end
   end
   
+  -- If the player is landing on the island
   if playerMovement then
-    if playerMovement.frame <= playerMovement.length then
+    if playerMovement.frame < playerMovement.length then
       playerMovement.frame = playerMovement.frame + 1
       
       playerTransitionY = playerMovement:valueAt(playerMovement.frame)
       
+      -- On the fourth last frame of the player's movement, swap their space to the landing space
       if playerMovement.frame == playerMovement.length - 3 then
         player.body.space = playerLandingSpace
-        
+      
+      -- On the last frame, switch to the landing animation
       elseif playerMovement.frame == playerMovement.length then
         playerLandingSpace.occupiedBy = player.body
         player.animation = player.leapLandingAnim
         player.landing = true
         lockInput(TURN_DELAY)
+        
+        level:doEnemyTurns(player)
         loadGameplay()
       end
     end
   
-  -- After a space is chosen, prepare the player for landing
+  -- Otherwise, check for the mouse clicking on a space to land on
   elseif not (movementFrame < LAST_LEVEL_MOVEMENT_FRAME) and mouseReleased and mouseSpace then
     
     if not mouseSpace:isOccupied() then
@@ -544,7 +616,6 @@ function updateChooseSpace()
       
       playerTransitionX = gridXOffset
       
-      level:doEnemyTurns(player)
     end
     
   end
@@ -588,55 +659,160 @@ function drawChooseSpace()
 end
 
 
+function loadWinter()
+  phase = WINTER
+  
+  level = levelgen.winterLevel()
+  
+  local first = -love.graphics.getHeight()
+  local last = math.floor((love.graphics.getHeight() - (level.height * tileSize)) / 2)
+  local length = LANDING_LEVEL_DOWN_LENGTH
+  
+  levelDownMovement = movement.Sine:newFadeOut(first, last, length)
+  
+  movementFrame = 0
+  
+  gridXOffset = math.floor((love.graphics.getWidth() - (level.width * tileSize)) / 2)
+  gridYOffset = first
+  
+  playerLandingSpace = nil
+  playerMovement = nil
+  player.flailing = false
+  
+  winterFrame = 0  -- Starts after the frog lands
+  winterFreezeY = -pixel * 10
+  
+  WINTER_START_WAIT_LENGTH = 30
+  WINTER_FREEZE_LENGTH = 30
+  
+  -- Energy decreases once every 9 frames, so the minimum energy requirement is
+  -- 360 / 9 = 40 and the maximum is 450 / 9 = 50.
+  winterFrozenLength = math.random(360, 450)
+  WINTER_UNFREEZE_LENGTH = 30
+  
+  WINTER_START_WAIT_FRAME = WINTER_START_WAIT_LENGTH
+  WINTER_FREEZE_FRAME = WINTER_START_WAIT_FRAME + WINTER_FREEZE_LENGTH
+  winterFrozenFrame = WINTER_FREEZE_FRAME + winterFrozenLength
+  winterUnfreezeFrame = winterFrozenFrame + WINTER_UNFREEZE_LENGTH
+end
+
+
+function updateWinter()
+  player:updateAnimation()
+  level:updateAllSpaces()
+  interface:update()
+  
+  if movementFrame < LAST_LEVEL_MOVEMENT_FRAME then
+    movementFrame = movementFrame + 1
+    
+    if movementFrame < LANDING_WAIT_FRAME then
+      
+    elseif movementFrame < LANDING_LEVEL_DOWN_FRAME then
+      gridYOffset = levelDownMovement:valueAt(movementFrame - LANDING_WAIT_FRAME)
+    else
+      gridYOffset = levelDownMovement.last
+    end
+  end
+  
+  if playerMovement then
+    
+    -- If the player is landing on the island
+    if playerMovement.frame < playerMovement.length then
+      playerMovement.frame = playerMovement.frame + 1
+      
+      playerTransitionY = playerMovement:valueAt(playerMovement.frame)
+      
+      -- On the fourth last frame of the player's movement, swap their space to the landing space
+      if playerMovement.frame == playerMovement.length - 3 then
+        player.body.space = playerLandingSpace
+      
+      -- On the last frame, switch to the landing animation
+      elseif playerMovement.frame == playerMovement.length then
+        playerLandingSpace.occupiedBy = player.body
+        player.animation = player.leapLandingAnim
+        player.landing = true
+        playerTransitionX = gridXOffset
+        playerTransitionY = gridYOffset
+      end
+    
+    -- Every frame after landing, this increases
+    else
+      winterFrame = winterFrame + 1
+      
+    end
+  
+  -- Otherwise, once the level has moved up, prepare the player for landing
+  elseif not (movementFrame < LAST_LEVEL_MOVEMENT_FRAME) then
+    
+    playerLandingSpace = level.spacesGrid[3][3]
+    
+    local col
+    local row
+    col, row = playerLandingSpace:randomCell()
+    player.body.space = spaces.Space:new(col, row, 1, 1)
+    spaceChosen = true
+    
+    local first = love.graphics.getHeight()
+    local last = gridYOffset
+    
+    playerMovement = movement.Linear:new(first, last, 20)
+    
+    player.animation = player.leapLandingAnim
+    
+    playerTransitionX = gridXOffset
+    
+  end
+  
+  if winterFrame < WINTER_START_WAIT_FRAME then
+    
+  elseif winterFrame < WINTER_FREEZE_FRAME then
+    winterFreezeY = winterFreezeY + 30
+  elseif winterFrame < winterFrozenFrame then
+    
+    -- Every nine frame, subtract one energy from the player
+    if winterFrame % 9 == 1 and player.energy > 0 then
+      player.energy = player.energy - 1
+      
+    end
+  
+  elseif winterFrame < winterUnfreezeFrame then
+    winterFreezeY = winterFreezeY - 30
+  end
+end
+
+
+function drawWinter()
+  for space, _ in pairs(level.spacesList) do
+    space:draw(gridXOffset, gridYOffset, pixel, pixel*2, pixel*2, highlighted)
+  end
+  
+  player:draw(playerTransitionX, playerTransitionY, pixel, tileSize)
+  interface:draw(pixel)
+  
+  -- Draws the icy sheet that covers the screen
+  if winterFreezeY > 0 then
+    love.graphics.setColor(FREEZE_COLOR)
+    love.graphics.rectangle("fill", 0, 0, love.graphics.getWidth(), winterFreezeY)
+    love.graphics.setColor(graphics.COLOR_WHITE)
+    iceWall:draw(1, 0, winterFreezeY, pixel)
+  end
+  
+  love.graphics.print("" .. winterFrame, 0, 0)
+  love.graphics.print("" .. player.energy, 0, 100)
+end
+
 
 --- Runs when the game is started.
 function love.load()
   math.randomseed(os.time())
   
+  love.window.setMode(267 * pixel, 200 * pixel)
+  
   -- gifMode()
   
   love.graphics.setBackgroundColor(graphics.COLOR_WATER)
   
-  GAMEPLAY = 0
-  TAKEOFF_COUNTDOWN = 1
-  TAKEOFF = 2
-  CHOOSE_SPACE = 3
-  phase = GAMEPLAY
-  
-  TURN_DELAY = 24  -- Amount of frames that movement is locked for after a move
-  turnDelayTimer = 0
-
   level = levelgen.randomLevel()
-  
-  takeoffCountdownTimer = 0
-  takeoffWaitCount = 0
-  playerTransitionX = 0
-  playerTransitionY = 0
-  TAKEOFF_COUNTDOWN_WAIT_LENGTH = 90
-  
-  TAKEOFF_WAIT_LENGTH = 36
-  TAKEOFF_LEVEL_DOWN_LENGTH = 45
-  TAKEOFF_PLAYER_CATCHUP_LENGTH = 55
-  TAKEOFF_DAYS_UNTIL_LENGTH = 360
-  TAKEOFF_PLAYER_DOWN_LENGTH = 15
-  
-  TAKEOFF_WAIT_FRAME = TAKEOFF_WAIT_LENGTH
-  TAKEOFF_LEVEL_DOWN_FRAME = TAKEOFF_WAIT_FRAME + TAKEOFF_LEVEL_DOWN_LENGTH
-  TAKEOFF_PLAYER_CATCHUP_FRAME = TAKEOFF_LEVEL_DOWN_FRAME + TAKEOFF_PLAYER_CATCHUP_LENGTH
-  TAKEOFF_DAYS_UNTIL_FRAME = TAKEOFF_PLAYER_CATCHUP_FRAME + TAKEOFF_DAYS_UNTIL_LENGTH
-  TAKEOFF_PLAYER_DOWN_FRAME = TAKEOFF_DAYS_UNTIL_FRAME + TAKEOFF_PLAYER_DOWN_LENGTH
-  
-  TAKEOFF_TEXT_FADE_IN_FRAME = TAKEOFF_PLAYER_CATCHUP_FRAME + 20
-  TAKEOFF_TEXT_FADE_OUT_FRAME = TAKEOFF_DAYS_UNTIL_FRAME - 90
-  
-  DAYS_LEFT_COLOR = graphics.convertColor({207, 254, 208})
-  
-  LANDING_WAIT_LENGTH = 30
-  LANDING_LEVEL_DOWN_LENGTH = 60
-  
-  LANDING_WAIT_FRAME = LANDING_WAIT_LENGTH
-  LANDING_LEVEL_DOWN_FRAME = LANDING_WAIT_FRAME + LANDING_LEVEL_DOWN_LENGTH
-  LAST_LEVEL_MOVEMENT_FRAME = LANDING_LEVEL_DOWN_FRAME
   
   -- Centers the level on the screen
   gridXOffset = math.floor((love.graphics.getWidth() - (level.width * tileSize)) / 2)
@@ -662,19 +838,6 @@ function love.load()
   ui.updateScreenSize(pixel)
   
   level:updateDistances(player.body.space)
-
-  lockMovement = false
-  
-  -- Keeps track of mouse events
-  mouseClicked = false
-  mouseHeld = false
-  mouseReleased = false
-  mouseDownPreviousFrame = false
-  
-  mouseSpace = nil
-  
-  -- Days until winter
-  daysLeft = 7
   
   -- Tracks fps
   totalTime = 0
@@ -704,6 +867,8 @@ function love.update(dt)
     updateTakeoff()
   elseif phase == CHOOSE_SPACE then
     updateChooseSpace()
+  elseif phase == WINTER then
+    updateWinter()
   end
 
 end
@@ -720,6 +885,8 @@ function love.draw()
     drawTakeoff()
   elseif phase == CHOOSE_SPACE then
     drawChooseSpace()
+  elseif phase == WINTER then
+    drawWinter()
   end
   
   -- FPS counter

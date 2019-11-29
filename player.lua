@@ -49,7 +49,7 @@ function player.Player:new(startSpace)
     
     body = bodies.WarpBody:new(startSpace),
     
-    energy = 20,
+    energy = 30,
     health = 5,
     
     eating = false,

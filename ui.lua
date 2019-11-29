@@ -107,6 +107,10 @@ function ui.UI:update()
     self.pipingEnergy = true
     self.energyPipeAnim = self.energyPipePipingAnim
     self.energyPipePipingAnim:reset()
+  
+  elseif self.actualEnergy > player.energy then
+    self.displayEnergy = player.energy
+    
   end
   
   self.actualEnergy = player.energy
@@ -118,20 +122,28 @@ function ui.UI:draw(scale)
   
   ui.energyBarBelow:draw(1, 0, ui.energyBarY, scale)
   
-  local energyX = 5 * scale
-  local energyY = (ui.energyBarY + 99 * scale) - (self.displayEnergy * scale)
-  local rectY = energyY + scale * 8
   
-  -- Draws the rest of the energy one pixel lower if the top-up animation is playing
-  if self.gainingEnergy then
-    rectY = rectY + scale
+  
+  
+  
+  -- Draws the energy (unless the player doesn't have any energy)
+  if self.displayEnergy > 0 then
+    
+    local energyX = 5 * scale
+    local energyY = (ui.energyBarY + 99 * scale) - (self.displayEnergy * scale)
+    local rectY = energyY + scale * 8
+      
+      -- Draws the rest of the energy one pixel lower if the top-up animation is playing
+    if self.gainingEnergy then
+      rectY = rectY + scale
+    end
+  
+    self.energyTopAnim:draw(energyX, energyY, scale)
+    
+    love.graphics.setColor(ui.energyColor)
+    love.graphics.rectangle("fill", energyX, rectY, scale * 14, self.displayEnergy * scale)
+    love.graphics.setColor(graphics.COLOR_WHITE)
   end
-  
-  self.energyTopAnim:draw(energyX, energyY, scale)
-  
-  love.graphics.setColor(ui.energyColor)
-  love.graphics.rectangle("fill", energyX, rectY, scale * 14, self.displayEnergy * scale)
-  love.graphics.setColor(graphics.COLOR_WHITE)
   
   ui.energyBarAbove:draw(1, 0, ui.energyBarY, scale)
   

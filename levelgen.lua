@@ -279,26 +279,26 @@ end
 
 -- Enemy introduction
 function levelgen.tutorialLevel4()
-  local level = grid.Grid:new(8, 3)
+  local level = grid.Grid:new(8, 5)
   
   -- Center line
   for x = 1, 8 do
-    level:addCellSpace(x, 2)
+    level:addCellSpace(x, 3)
   end
   
   -- Top bit
   for x = 2, 4 do
-    level:addCellSpace(x, 3)
+    level:addCellSpace(x, 4)
   end
   
   -- Bottom bit
   for x = 5, 7 do
-    level:addCellSpace(x, 1)
+    level:addCellSpace(x, 2)
   end
   
   level:refreshAllAdjacent()
   
-  local rat = entities.Rat:new(level.spacesGrid[8][2])
+  local rat = entities.Rat:new(level.spacesGrid[8][3])
   rat.body.bugs = {}
   rat.moveTimer = 1
   rat.animation = rat.idleAnim2
@@ -306,72 +306,72 @@ function levelgen.tutorialLevel4()
   
   level:addEnemy(rat)
   
-  level:addCenteredSmallText("Watch out!  It's an enemy!", -56)
-  level:addCenteredSmallText("Try to get past it without getting hurt.", -46)
+  level:addCenteredSmallText("Watch out!  It's an enemy!", -32)
+  level:addCenteredSmallText("Try to get past it without getting hurt.", -22)
   return level
 end
 
 
 -- Fleas introduction
 function levelgen.tutorialLevel5()
-  local level = grid.Grid:new(9, 5)
+  local level = grid.Grid:new(9, 7)
   
   -- Center line
   for x = 1, 9 do
-    level:addCellSpace(x, 3)
+    level:addCellSpace(x, 4)
   end
   
   -- Middle top and middle bottom lines
   for x = 3, 7 do
-    level:addCellSpace(x, 2)
-    level:addCellSpace(x, 4)
+    level:addCellSpace(x, 3)
+    level:addCellSpace(x, 5)
   end
   
   -- Top and bottom lines
   for x = 4, 6 do
-    level:addCellSpace(x, 1)
-    level:addCellSpace(x, 5)
+    level:addCellSpace(x, 2)
+    level:addCellSpace(x, 6)
   end
   
   level:refreshAllAdjacent()
   
-  local rat = entities.Rat:new(level.spacesGrid[5][3])
+  local rat = entities.Rat:new(level.spacesGrid[5][4])
   rat.body.moveDirection = "right"
   
   level:addEnemy(rat)
   
-  level:addCenteredSmallText("You'll need food to survive the winter!", -37)
-  level:addCenteredSmallText("Click on an enemy to eat its fleas.", -27)
-  level:addCenteredSmallText("Eat all the fleas before continuing the tutorial!", -17)
+  level:addCenteredSmallText("You'll need food to survive the winter!", -13)
+  level:addCenteredSmallText("Click on an enemy to eat its fleas.", -3)
+  level:addCenteredSmallText("Eat all the fleas before continuing the tutorial!", 7)
   return level
 end
 
 
 -- Energy bar intro
 function levelgen.tutorialLevel6()
-  local level = grid.Grid:new(9, 5)
+  local level = grid.Grid:new(9, 7)
   
   -- Center line
   for x = 1, 9 do
-    level:addCellSpace(x, 3)
+    level:addCellSpace(x, 4)
   end
   
   -- All the other lines
   for x = 3, 7 do
-    level:addCellSpace(x, 1)
     level:addCellSpace(x, 2)
-    level:addCellSpace(x, 4)
+    level:addCellSpace(x, 3)
     level:addCellSpace(x, 5)
+    level:addCellSpace(x, 6)
   end
   
   level:refreshAllAdjacent()
   
-  local rat1 = entities.Rat:new(level.spacesGrid[4][2])
+  local rat1 = entities.Rat:new(level.spacesGrid[4][3])
   rat1.moveTimer = 0
   rat1.animation = rat1.idleAnim1
   rat1.body.moveDirection = "left"
   
-  local rat2 = entities.Rat:new(level.spacesGrid[6][4])
+  local rat2 = entities.Rat:new(level.spacesGrid[6][5])
   rat2.moveTimer = 1
   rat2.animation = rat2.idleAnim2
   rat2.body.moveDirection = "left"
@@ -379,9 +379,9 @@ function levelgen.tutorialLevel6()
   level:addEnemy(rat1)
   level:addEnemy(rat2)
   
-  level:addCenteredSmallText("Filling up to the red line guarantees survival!", -37)
-  level:addCenteredSmallText("If you're lucky, you can get away with less.", -27)
-  level:addCenteredSmallText("Eat at least 4 fleas here before continuing.", -17)
+  level:addCenteredSmallText("Filling up to the red line guarantees survival!", -13)
+  level:addCenteredSmallText("If you're lucky, you can get away with less.", -3)
+  level:addCenteredSmallText("Eat at least 4 fleas here before continuing.", 7)
   
   return level
 end
@@ -389,43 +389,43 @@ end
 
 -- Enemies using noneuclilypads 1
 function levelgen.tutorialLevel7()
-  local level = grid.Grid:new(9, 5)
+  local level = grid.Grid:new(9, 7)
   
   -- Center line
   for x = 1, 9 do
-    level:addCellSpace(x, 3)
+    level:addCellSpace(x, 4)
   end
   
   -- Middle top and middle bottom lines
   for x = 3, 7 do
-    level:addCellSpace(x, 2)
-    level:addCellSpace(x, 4)
+    level:addCellSpace(x, 3)
+    level:addCellSpace(x, 5)
   end
   
   -- Top and bottom lines
   for x = 4, 6 do
-    level:addCellSpace(x, 1)
-    level:addCellSpace(x, 5)
+    level:addCellSpace(x, 2)
+    level:addCellSpace(x, 6)
   end
   
   -- Top noneuclilypad
-  level:mergeCoordinates(4, 2, 5, 2)
-  level:mergeCoordinates(5, 2, 6, 2)
+  level:mergeCoordinates(4, 3, 5, 3)
+  level:mergeCoordinates(5, 3, 6, 3)
   
   -- Bottom noneuclilypad
-  level:mergeCoordinates(4, 4, 5, 4)
-  level:mergeCoordinates(5, 4, 6, 4)
+  level:mergeCoordinates(4, 5, 5, 5)
+  level:mergeCoordinates(5, 5, 6, 5)
   level:refreshAllAdjacent()
   
-  local rat = entities.Rat:new(level.spacesGrid[3][3])
+  local rat = entities.Rat:new(level.spacesGrid[3][4])
   rat.moveTimer = 1
   rat.animation = rat.idleAnim2
   rat.body.moveDirection = "right"
   
   level:addEnemy(rat)
   
-  level:addCenteredSmallText("Enemies can use noneuclilypads too!", -32)
-  level:addCenteredSmallText("Eat all the fleas here to continue.", -22)
+  level:addCenteredSmallText("Enemies can use noneuclilypads too!", -8)
+  level:addCenteredSmallText("Eat all the fleas here to continue.", 2)
   
   return level
 end
@@ -433,34 +433,34 @@ end
 
 -- Enemies using noneuclilypads 2
 function levelgen.tutorialLevel8()
-  local level = grid.Grid:new(9, 5)
+  local level = grid.Grid:new(9, 7)
   
   -- Center line
   for x = 1, 9 do
-    level:addCellSpace(x, 3)
+    level:addCellSpace(x, 4)
   end
   
   -- All other lines
   for x = 3, 7 do
-    level:addCellSpace(x, 1)
     level:addCellSpace(x, 2)
-    level:addCellSpace(x, 4)
+    level:addCellSpace(x, 3)
     level:addCellSpace(x, 5)
+    level:addCellSpace(x, 6)
   end
   
-  level:mergeCoordinates(5, 2, 5, 3)
   level:mergeCoordinates(5, 3, 5, 4)
+  level:mergeCoordinates(5, 4, 5, 5)
   
   level:refreshAllAdjacent()
   
   -- Top left rat
-  local rat1 = entities.Rat:new(level.spacesGrid[4][2])
+  local rat1 = entities.Rat:new(level.spacesGrid[4][3])
   rat1.moveTimer = 0
   rat1.animation = rat1.idleAnim1
   rat1.body.moveDirection = "left"
   
   -- Bottom right rat
-  local rat2 = entities.Rat:new(level.spacesGrid[6][4])
+  local rat2 = entities.Rat:new(level.spacesGrid[6][5])
   rat2.moveTimer = 1
   rat2.animation = rat2.idleAnim2
   rat2.body.moveDirection = "left"
@@ -468,7 +468,7 @@ function levelgen.tutorialLevel8()
   level:addEnemy(rat1)
   level:addEnemy(rat2)
   
-  level:addCenteredSmallText("Eat four fleas to continue.", -27)
+  level:addCenteredSmallText("Eat four fleas to continue.", -3)
   
   return level
 end
@@ -499,8 +499,8 @@ function levelgen.tutorialLevel9()
 
   level:refreshAllAdjacent()
   
-  level:addCenteredSmallText("One last thing - ", -37)
-  level:addCenteredSmallText("to jump between islands, you must click yourself.", -27)
+  level:addCenteredSmallText("One last thing!", -37)
+  level:addCenteredSmallText("To jump between islands, you must click yourself.", -27)
   level:addCenteredSmallText("This takes 3 turns to charge, so be careful!", -17)
   
   level:addCenteredSmallText("This is the end of the tutorial.", 122)
@@ -526,12 +526,24 @@ levelgen.tutorialStartPositions = {
   {7, 2},  -- 1
   {1, 2},  -- 2
   {9, 3},  -- 3
-  {1, 2},  -- 4
-  {9, 3},  -- 5
-  {1, 3},  -- 6
-  {9, 3},  -- 7
-  {1, 3},  -- 8
+  {1, 3},  -- 4
+  {9, 4},  -- 5
+  {1, 4},  -- 6
+  {9, 4},  -- 7
+  {1, 4},  -- 8
   {9, 3},  -- 9
+}
+
+levelgen.tutorialStartDirections = {
+  "left",
+  "right",
+  "left",
+  "right",
+  "left",
+  "right",
+  "left",
+  "right",
+  "left"
 }
 
 

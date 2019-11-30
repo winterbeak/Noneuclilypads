@@ -284,7 +284,7 @@ end
 function snake.Snake:canMoveTo(space)
   local restrictedDirection = misc.oppositeOf(self.bodyList[1].moveDirection)
   for direction, spaceList in pairs(self.bodyList[1].space.adjacent) do
-    print(direction)
+    print("Snake direction:" .. direction)
     if direction ~= restrictedDirection then
       if spaceList[space] then
         return true

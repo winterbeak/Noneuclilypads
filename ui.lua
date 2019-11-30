@@ -137,6 +137,8 @@ function ui.UI:new(player)
     lastFrameEnergy = player.energy,
     displayEnergy = player.energy,
     
+    displayHealth = player.health,
+    
     heartVineFader = ui.Fader:new(0, 1, ui.DEFAULT_FADE_LENGTH),
     energyBarFader = ui.Fader:new(0, 1, ui.DEFAULT_FADE_LENGTH),
     
@@ -166,7 +168,7 @@ function ui.UI:update()
     if self.energyPipePipingAnim.isDone then
       self.pipingEnergy = false
       self.energyPipeAnim = self.energyPipeIdleAnim
-      self.displayEnergy = player.energy
+      self.displayEnergy = self.player.energy
       
       self.gainingEnergy = true
       self.energyTopAnim = self.energyTopUpAnim
@@ -186,21 +188,22 @@ function ui.UI:update()
   end
   
   -- If an increase in energy is detected, play the pipe bulging animation
-  if self.lastFrameEnergy < player.energy then
+  if self.lastFrameEnergy < self.player.energy then
     self.pipingEnergy = true
     self.energyPipeAnim = self.energyPipePipingAnim
     self.energyPipePipingAnim:reset()
   
   -- If a decrease in energy is detected, play the energy moving down animation
-  elseif self.lastFrameEnergy > player.energy then
+  elseif self.lastFrameEnergy > self.player.energy then
     self.losingEnergy = true
     self.energyTopAnim = self.energyTopDownAnim
     self.energyTopAnim:reset()
-    self.displayEnergy = player.energy
+    self.displayEnergy = self.player.energy
     
   end
   
-  self.lastFrameEnergy = player.energy
+  self.displayHealth = self.player.health
+  self.lastFrameEnergy = self.player.energy
 
 end
 
@@ -264,7 +267,7 @@ function ui.UI:drawHeartVine(scale)
   graphics.setAlpha(self.heartVineFader.value)
   
   ui.heartVine:draw(1, ui.heartVineX, ui.heartVineY, scale)
-  for i = 1, player.health do
+  for i = 1, self.player.health do
     ui.hearts:draw(i, ui.heartVineX + ui.heartX[i], ui.heartVineY + ui.heartY[i], scale)
   end
 end

@@ -95,6 +95,9 @@ level = nil  -- Level grid object
 onMenu = true
 onTutorial = false
 
+screenTransition = graphics.ScreenTransition:new()
+tutorialResetButton = nil
+
 
 function debugTutorial(phase)
   onMenu = false
@@ -119,6 +122,9 @@ function changePixel(value)
   -- Centers the level on the screen
   gridXOffset = math.floor((love.graphics.getWidth() - (level.width * tileSize)) / 2)
   gridYOffset = math.floor((love.graphics.getHeight() - (level.height * tileSize)) / 2)
+  
+  -- Creates a new screen transition to match the size of the screen
+  screenTransition = graphics.ScreenTransition:new()
   
 end
 
@@ -300,6 +306,10 @@ function updateGameplay()
         -- Places the player at their starting position
         local startPosition = levelgen.tutorialStartPositions[tutorialPhase]
         player.body:goTo(level.spacesGrid[startPosition[1]][startPosition[2]])
+        player.body.moveDirection = levelgen.tutorialStartDirections[tutorialPhase]
+        
+        -- Removes the reset button
+        tutorialResetButton = nil
       end
     
     -- Moves the next level down
@@ -318,7 +328,10 @@ function updateGameplay()
   
   
   -- What happens when the mouse is clicked
-  if not lockMovement and mouseReleased and mouseSpace and not tutorialTransitioning then
+  local movementAttempted = mouseReleased and mouseSpace
+  local lockedMovement = lockMovement or tutorialTransitioning or screenTransition.activated
+  
+  if movementAttempted and not lockedMovement then
     
     local validMove
     local eatFlies
@@ -375,6 +388,34 @@ function updateGameplay()
   end
   
   
+  if onTutorial then
+    if not (screenTransition.activated or tutorialTransitioning) then
+      if movementAttempted and mouseSpace == tutorialResetButton then
+        screenTransition:start()
+      
+      elseif interface.displayHealth <= 0 then
+        screenTransition:start()
+        
+      end
+    
+    else
+  
+      if screenTransition.middleFrame then
+        tutorialResetButton = nil
+        
+        player.health = 5
+        player.energy = 0
+        
+        level = levelgen.tutorialLevelGenerators[tutorialPhase]()
+        
+        local position = levelgen.tutorialStartPositions[tutorialPhase]
+        player.body:goTo(level.spacesGrid[position[1]][position[2]])
+        player.body.moveDirection = levelgen.tutorialStartDirections[tutorialPhase]
+      end
+    end
+  end
+  
+  
   -- Detects tutorial progress conditions
   if onTutorial and not tutorialTransitioning then
     
@@ -402,17 +443,23 @@ function updateGameplay()
     
     -- End of intro to enemies
     elseif tutorialPhase == 4 then
-      if player.body.space == level.spacesGrid[8][2] then
+           
+      if player.body.space == level.spacesGrid[8][3] then
         loadTutorialTransition()
         
         -- Fades in the energy bar ui
         interface.energyBarFader:setLength(30)
         interface.energyBarFader:fadeUp()
+      
+      elseif (not screenTransition.activated) and interface.displayHealth <= 4 then
+        screenTransition:start()
+        
       end
+      
     
     -- End of intro to fleas
     elseif tutorialPhase == 5 then
-      if player.body.space == level.spacesGrid[1][3] then
+      if player.body.space == level.spacesGrid[1][4] then
         
         -- Check that the player ate all the fleas
         for rat, _ in pairs(level.enemyList) do
@@ -426,7 +473,7 @@ function updateGameplay()
     
     -- End of fleas 2
     elseif tutorialPhase == 6 then
-      if player.body.space == level.spacesGrid[9][3] then
+      if player.body.space == level.spacesGrid[9][4] then
         
         -- Checks that the player ate enough fleas
         local totalFleas = 0
@@ -442,7 +489,7 @@ function updateGameplay()
       
     -- End of enemies with noneuclilypads 1
     elseif tutorialPhase == 7 then
-      if player.body.space == level.spacesGrid[1][3] then
+      if player.body.space == level.spacesGrid[1][4] then
         
         -- Check that the player ate all the fleas
         for rat, _ in pairs(level.enemyList) do
@@ -456,7 +503,7 @@ function updateGameplay()
     
     -- End of enemies with noneuclilypads 2
     elseif tutorialPhase == 8 then
-      if player.body.space == level.spacesGrid[9][3] then
+      if player.body.space == level.spacesGrid[9][4] then
         
         -- Checks that the player ate enough fleas
         local totalFleas = 0
@@ -481,6 +528,24 @@ function updateGameplay()
         tutorialPhase = 0
         
         player:drainEnergy()
+      end
+      
+    end
+    
+    -- Displays the "reset" button if the player gets trapped
+    if not (tutorialTransitioning or tutorialResetButton) and tutorialPhase >= 4 then
+      local validMoveExists = false
+      for space, _ in pairs(player.body.space.adjacentList) do
+        if not space:isOccupied() then
+          validMoveExists = true
+          break
+        end
+      end
+      
+      if not validMoveExists then
+        level:addSpace({{4, 7}, {5, 7}, {6, 7}})
+        tutorialResetButton = level.spacesGrid[4][7]
+        tutorialResetButton.isButton = true
       end
       
     end
@@ -512,7 +577,10 @@ function drawGameplay()
   for space, _ in pairs(level.spacesList) do
     highlighted = false
     
-    if space.occupiedBy == player.body then
+    if space.isButton and mouseSpace == space then
+      highlighted = true
+      
+    elseif space.occupiedBy == player.body then
       highlighted = true
       
     elseif not (space:isOccupied() and (#space.occupiedBy.bugs <= 0)) then
@@ -573,6 +641,13 @@ function drawGameplay()
     graphics.setAlpha(firstLandingTextAlpha)
     love.graphics.setFont(graphics.tutorialFont)
     love.graphics.print("Choose a space to land on!", x, y)
+  end
+  
+  if tutorialResetButton then
+    love.graphics.setFont(graphics.tutorialFont)
+    love.graphics.setColor(graphics.COLOR_WHITE)
+    
+    love.graphics.print("Reset", gridXOffset + pixel * 94, gridYOffset + pixel * 148)
   end
 end
 
@@ -1150,12 +1225,14 @@ function love.load()
   totalFrames = 0
   
   -- Starts the game with the tutorial on the given phase
-  -- debugTutorial(9)
+  debugTutorial(5)
 end
 
 
 --- Runs every frame.
 function love.update(dt)
+  
+  screenTransition:update()
   
   -- Updates fps
   if showFPS then
@@ -1185,6 +1262,8 @@ end
 --- Runs every frame.
 function love.draw()
   
+  love.graphics.setColor(graphics.COLOR_WHITE)
+  
   if phase == GAMEPLAY then
     drawGameplay()
   elseif phase == TAKEOFF_COUNTDOWN then
@@ -1196,6 +1275,8 @@ function love.draw()
   elseif phase == WINTER then
     drawWinter()
   end
+  
+  screenTransition:draw()
   
   -- FPS counter
   if showFPS then

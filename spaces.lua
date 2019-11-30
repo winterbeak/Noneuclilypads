@@ -75,6 +75,8 @@ function spaces.Space:new(col, row, spriteNum, decorNum)
     
     exploding = false,
     explodingAnim = nil,
+    
+    isButton = false,
   }
   
   newObj.cells[col][row] = true

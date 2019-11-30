@@ -1,3 +1,5 @@
+local movement = require("movement")
+
 local graphics = {}
 
 
@@ -50,6 +52,8 @@ graphics.COLOR_LILLYPAD_OUTLINE_HIGHLIGHT = graphics.convertColor({114, 112, 17}
 graphics.COLOR_WATER = graphics.convertColor({0, 255, 182})
 graphics.COLOR_WATER_SHADOW = graphics.convertColor({0, 0, 0, 76})
 
+graphics.TRANSITION_COLOR = graphics.convertColor({0, 38, 74})
+
 
 -- Changes the resampling mode so that pixel art is crisp when resized.
 love.graphics.setDefaultFilter("nearest", "nearest")
@@ -91,6 +95,75 @@ function graphics.Text:draw(font, scale, x, y)
   love.graphics.print(self.text, x, y)
 end
 
+
+graphics.ScreenTransition = {}
+
+function graphics.ScreenTransition:new()
+  local newObj = {
+    activated = false,
+    fullyCovering = false,
+    middleFrame = false,
+    
+    bottomY = 0,
+    topY = 0,
+    
+    waitFrame = 0,
+    waitLength = 60,
+    
+    bottomMovement = movement.Sine:newFadeOut(0, love.graphics.getHeight(), 30),
+    topMovement = movement.Sine:newFadeOut(0, love.graphics.getHeight(), 30)
+  }
+  
+  self.__index = self
+  return setmetatable(newObj, self)
+end
+
+
+function graphics.ScreenTransition:start()
+  self.bottomMovement.frame = 0
+  self.topMovement.frame = 0
+  self.waitFrame = 0
+  self.activated = true
+end
+
+
+function graphics.ScreenTransition:update()
+  if self.activated then
+    if self.bottomMovement.frame < self.bottomMovement.length then
+      self.bottomMovement.frame = self.bottomMovement.frame + 1
+      self.fullyCovering = false
+    
+    elseif self.waitFrame < self.waitLength then
+      self.waitFrame = self.waitFrame + 1
+      self.fullyCovering = true
+      
+      if self.waitFrame == math.floor(self.waitLength / 2) then
+        self.middleFrame = true
+      else
+        self.middleFrame = false
+      end
+      
+    elseif self.topMovement.frame < self.topMovement.length then
+      self.topMovement.frame = self.topMovement.frame + 1
+      self.fullyCovering = false
+    
+    else
+      self.activated = false
+      
+    end
+  end
+end
+
+
+function graphics.ScreenTransition:draw()
+  love.graphics.setColor(graphics.TRANSITION_COLOR)
+  
+  local y = self.topMovement:currentValue()
+  local width = love.graphics.getWidth()
+  local height = self.bottomMovement:currentValue() - y
+  
+  love.graphics.rectangle("fill", 0, y, width, height)
+end
 
 
 graphics.SpriteSheet = {}

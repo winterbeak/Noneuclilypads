@@ -223,7 +223,6 @@ function ui.UI:drawEnergyBar(scale)
   
   ui.energyBarBelow:draw(1, 0, ui.energyBarY, scale)
   
-  
   -- Draws a full energy bar
   if self.displayEnergy > 84 then
     local rectX = 5 * scale

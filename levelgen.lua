@@ -128,26 +128,26 @@ end
 
 --- The level that the frog lands on to hibernate.
 function levelgen.winterLevel()
-  local level = grid.Grid:new(5, 5)
+  local level = grid.Grid:new(7, 7)
   
   -- Center plus
-  level:addCellSpace(3, 3)
-  level:addCellSpace(2, 3)
-  level:addCellSpace(3, 2)
-  level:addCellSpace(4, 3)
+  level:addCellSpace(4, 4)
   level:addCellSpace(3, 4)
+  level:addCellSpace(4, 3)
+  level:addCellSpace(5, 4)
+  level:addCellSpace(4, 5)
   
   -- Corners
-  chanceAdd(level, 3, 4, 2, 2)
-  chanceAdd(level, 3, 4, 2, 4)
-  chanceAdd(level, 3, 4, 4, 2)
-  chanceAdd(level, 3, 4, 4, 4)
+  chanceAdd(level, 3, 4, 3, 3)
+  chanceAdd(level, 3, 4, 3, 5)
+  chanceAdd(level, 3, 4, 5, 3)
+  chanceAdd(level, 3, 4, 5, 5)
   
   -- Extended plus
-  chanceAdd(level, 1, 4, 1, 3)
-  chanceAdd(level, 1, 4, 3, 1)
-  chanceAdd(level, 1, 4, 5, 3)
-  chanceAdd(level, 1, 4, 3, 5)
+  chanceAdd(level, 1, 4, 2, 4)
+  chanceAdd(level, 1, 4, 4, 2)
+  chanceAdd(level, 1, 4, 6, 4)
+  chanceAdd(level, 1, 4, 4, 6)
   
   level:refreshAllAdjacent()
   

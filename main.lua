@@ -98,6 +98,17 @@ onTutorial = false
 screenTransition = graphics.ScreenTransition:new()
 tutorialResetButton = nil
 
+survivedWinter = false
+returnToMenuButton = nil
+continueButton = nil
+
+returnToMenuTextX = 0
+returnToMenuTextY = 0
+continueTextX = 0
+continueTextY = 0
+
+takeoffFromWinter = false
+
 
 function debugTutorial(phase)
   onMenu = false
@@ -630,9 +641,6 @@ function drawGameplay()
   
   interface:draw(pixel)
   
-  love.graphics.setFont(graphics.winterFont)
-  -- love.graphics.print("YOU DIDN'T SURVIVE THE WINTER", pixel * 40, pixel * 30)
-  
   -- Draws the "choose a space to land on" text
   if firstLanding and not (onMenu or onTutorial) then
     local x = firstLandingTextX
@@ -694,10 +702,18 @@ function drawTakeoffCountdown()
   end
   
   level:drawTexts(gridXOffset, gridYOffset, pixel)
+  
+  -- Draws the winter text on the winter level
+  if takeoffFromWinter then
+    drawWinterText()
+  end
+  
   level:drawEnemies(gridXOffset, gridYOffset, pixel, tileSize)
   player:draw(gridXOffset, gridYOffset, pixel, tileSize)
   
   interface:draw(pixel)
+  
+  
   
 end
 
@@ -728,6 +744,7 @@ function loadTakeoff()
   -- Resets fade length to defaults
   interface.heartVineFader:setLength(ui.DEFAULT_FADE_LENGTH)
   interface.energyBarFader:setLength(ui.DEFAULT_FADE_LENGTH)
+  
 end
 
 
@@ -825,6 +842,12 @@ function drawTakeoff()
     end
     
     level:drawTexts(gridXOffset, gridYOffset, pixel)
+    
+    -- Draws the winter text on the winter level if the winter level is still on screen
+    if takeoffFromWinter then
+      drawWinterText()
+    end
+  
     level:drawEnemies(gridXOffset, gridYOffset, pixel, tileSize)
     
   elseif takeoffFrame < TAKEOFF_PLAYER_DOWN_FRAME then
@@ -901,6 +924,9 @@ function loadChooseSpace()
     end
     
   end
+  
+  -- After the takeoff is done, then the takeoff stops being from winter.
+  takeoffFromWinter = false
   
 end
 
@@ -1052,14 +1078,18 @@ function loadWinter()
   WINTER_FREEZE_LENGTH = 30
   
   -- Energy decreases once every 9 frames, so the minimum energy requirement is
-  -- 360 / 9 = 40 and the maximum is 450 / 9 = 50.
-  winterFrozenLength = math.random(360, 450)
+  -- 360 / 9 = 40 and the maximum is 441 / 9 = 49.
+  winterFrozenLength = math.random(360, 441)
   WINTER_UNFREEZE_LENGTH = 30
+  WINTER_RESULTS_LENGTH = 120
+  WINTER_BUTTONS_LENGTH = 150
   
   WINTER_START_WAIT_FRAME = WINTER_START_WAIT_LENGTH
   WINTER_FREEZE_FRAME = WINTER_START_WAIT_FRAME + WINTER_FREEZE_LENGTH
   winterFrozenFrame = WINTER_FREEZE_FRAME + winterFrozenLength
   winterUnfreezeFrame = winterFrozenFrame + WINTER_UNFREEZE_LENGTH
+  winterResultsFrame = winterUnfreezeFrame + WINTER_RESULTS_LENGTH
+  winterButtonsFrame = winterResultsFrame + WINTER_BUTTONS_LENGTH
 end
 
 
@@ -1068,6 +1098,7 @@ function updateWinter()
   level:updateAllSpaces()
   interface:update()
   
+  -- Level moving down onto the screen
   if movementFrame < LAST_LEVEL_MOVEMENT_FRAME then
     movementFrame = movementFrame + 1
     
@@ -1080,6 +1111,7 @@ function updateWinter()
     end
   end
   
+  -- Player landing on the island
   if playerMovement then
     
     -- If the player is landing on the island
@@ -1110,7 +1142,7 @@ function updateWinter()
   -- Otherwise, once the level has moved up, prepare the player for landing
   elseif not (movementFrame < LAST_LEVEL_MOVEMENT_FRAME) then
     
-    playerLandingSpace = level.spacesGrid[3][3]
+    playerLandingSpace = level.spacesGrid[4][4]
     
     local col
     local row
@@ -1129,10 +1161,14 @@ function updateWinter()
     
   end
   
+  -- Stuff during the winter
   if winterFrame < WINTER_START_WAIT_FRAME then
-    
+  
+  -- When the ice sheet comes down
   elseif winterFrame < WINTER_FREEZE_FRAME then
     winterFreezeDownY = winterFreezeDownY + 30
+    
+  -- During the frozen time
   elseif winterFrame < winterFrozenFrame then
     
     -- Every nine frame, subtract one energy from the player
@@ -1141,15 +1177,107 @@ function updateWinter()
       
     end
   
+  -- When the ice shset goes back up
   elseif winterFrame < winterUnfreezeFrame then
     winterFreezeUpY = winterFreezeUpY + 30
+  
+  -- Frame when the buttons appear
+  elseif winterFrame == winterButtonsFrame then
+    if player.energy <= 0 then
+      level:addSpace({{3, 7}, {4, 7}, {5, 7}})
+      returnToMenuButton = level.spacesGrid[3][7]
+      returnToMenuButton.isButton = true
+      
+      returnToMenuTextX = 58 * pixel
+      returnToMenuTextY = 148 * pixel
+      
+    else
+      level:addSpace({{1, 7}, {2, 7}, {3, 7}})
+      returnToMenuButton = level.spacesGrid[2][7]
+      returnToMenuButton.isButton = true
+      
+      returnToMenuTextX = 9 * pixel
+      returnToMenuTextY = 148 * pixel
+      
+      level:addSpace({{5, 7}, {6, 7}, {7, 7}})
+      continueButton = level.spacesGrid[5][7]
+      continueButton.isButton = true
+      
+      continueTextX = 111 * pixel
+      continueTextY = 148 * pixel
+    end
   end
+  
+  -- If the screen transition has not been activated, allow clicking on buttons
+  if not screenTransition.activated then
+    
+    -- If the return to menu button is clicked
+    if mouseReleased and mouseSpace then
+      if mouseSpace == returnToMenuButton then
+        screenTransition:start()
+    
+      -- If the continue button is clicked
+      elseif mouseSpace == continueButton then
+        loadTakeoffCountdown()
+        takeoffFromWinter = true
+        daysLeft = STARTING_DAYS_LEFT + 1
+        
+        returnToMenuButton = nil
+        continueButton = nil
+      end
+      
+    end
+      
+  -- If the screen transition is on its middle frame, switch to the main menu
+  elseif screenTransition.activated and screenTransition.middleFrame then
+    onMenu = true
+    level = levelgen.menuLevel()
+    
+    gridXOffset = level:centerScreenX(tileSize)
+    gridYOffset = level:centerScreenY(tileSize)
+    
+    player.body:goTo(level.spacesGrid[8][4])
+    player.energy = 0
+    player.health = 5
+    
+    returnToMenuButton = nil
+    continueButton = nil
+    
+    interface.heartVineFader:setValue(0)
+    interface.energyBarFader:setValue(0)
+    
+    loadGameplay()
+  end
+
 end
 
 
 function drawWinter()
   for space, _ in pairs(level.spacesList) do
-    space:draw(gridXOffset, gridYOffset, pixel, pixel*2, pixel*2, highlighted)
+    highlighted = false
+    
+    if space.isButton and mouseSpace == space then
+      highlighted = true
+    end
+    
+    -- "Compresses" a space if the mouse is hovering over it.
+    if highlighted and space == mouseSpace then
+      
+      -- If the mouse is being held, compress it more
+      if mouseHeld then
+        space:draw(gridXOffset + pixel*2, gridYOffset + pixel*2, pixel, 0, 0, highlighted)
+        
+      -- Otherwise, compress it the normal amount
+      else
+        space:draw(gridXOffset + pixel, gridYOffset + pixel, pixel, pixel, pixel, highlighted)
+        
+      end
+      
+    -- Otherwise, draws the space normally
+    else
+      space:draw(gridXOffset, gridYOffset, pixel, pixel*2, pixel*2, highlighted)
+    end
+    
   end
   
   player:draw(playerTransitionX, playerTransitionY, pixel, tileSize)
@@ -1168,8 +1296,34 @@ function drawWinter()
     iceWallUp:draw(1, 0, winterFreezeUpY, pixel)
   end
   
-  love.graphics.print("" .. winterFrame, 0, 0)
-  love.graphics.print("" .. player.energy, 0, 100)
+  drawWinterText()
+  
+  -- love.graphics.print("" .. winterFrame, 0, 0)
+  -- love.graphics.print("" .. player.energy, 0, 100)
+end
+
+
+function drawWinterText()
+  love.graphics.setColor(graphics.COLOR_WHITE)
+  love.graphics.setFont(graphics.winterFont)
+  
+  if winterFrame >= winterResultsFrame then
+    
+    if player.energy > 0 then
+      love.graphics.print("YOU SURVIVED THE WINTER!", pixel * 56, gridYOffset + pixel * 4)
+    else
+      love.graphics.print("YOU DIDN'T SURVIVE THE WINTER", pixel * 40, gridYOffset + pixel * 4)
+    end
+    
+  end
+  
+  love.graphics.setFont(graphics.tutorialFont)
+  if returnToMenuButton then
+    love.graphics.print("Main Menu", returnToMenuTextX + gridXOffset, returnToMenuTextY + gridYOffset)
+  end
+  if continueButton then
+    love.graphics.print("Continue", continueTextX + gridXOffset, continueTextY + gridYOffset)
+  end
 end
 
 
@@ -1203,35 +1357,36 @@ function love.load()
   level = levelgen.menuLevel()
   -- level = levelgen.randomLevel()
   
-  -- Centers the level on the screen
-  gridXOffset = level:centerScreenX(tileSize)
-  gridYOffset = level:centerScreenY(tileSize)
+  player = entities.Player:new(level.spacesGrid[8][4])
+  
+  interface = ui.UI:new(player)
+  ui.updateScreenSize(pixel)
   
   --level:addEnemy(entities.Rat:new(level.spacesGrid[5][4]))
   --level:addEnemy(entities.Snake:newRandom(level.spacesGrid[5][5]))
   --level:addEnemy(entities.Snake:newRandom(level.spacesGrid[6][7]))
   --level:addEnemy(entities.Slug:new(level.spacesGrid[7][1]))
+  -- level:updateDistances(player.body.space)
   
-  player = entities.Player:new(level.spacesGrid[8][4])
-  
-  interface = ui.UI:new(player)
-  
-  ui.updateScreenSize(pixel)
-  
-  level:updateDistances(player.body.space)
+  -- Centers the level on the screen
+  gridXOffset = level:centerScreenX(tileSize)
+  gridYOffset = level:centerScreenY(tileSize)
   
   -- Tracks fps
   totalTime = 0
   totalFrames = 0
   
+  -- Starts the game on the winter phase
+  -- onMenu = false
+  -- loadWinter()
+  
   -- Starts the game with the tutorial on the given phase
-  debugTutorial(5)
+  -- debugTutorial(5)
 end
 
 
 --- Runs every frame.
 function love.update(dt)
-  
   screenTransition:update()
   
   -- Updates fps

@@ -49,15 +49,19 @@ function player.Player:new(startSpace)
     
     body = bodies.WarpBody:new(startSpace),
     
-    energy = 30,
+    energy = 0,
     health = 5,
+    
+    drainingEnergy = false,
     
     eating = false,
     eatSpace = nil,  -- The space that the player is eating bugs from
     eatBody = nil,  -- The body that the player is eating bugs from
     tongueBaseAnim = graphics.Animation:new(player.tongueBase),
     tongueTipAnim = graphics.Animation:new(player.tongueTip),
+    
   }
+  
   newObj.jumpAnim:setFrameLength(3)
   newObj.tongueBaseAnim:setFrameLength(3)
   newObj.tongueTipAnim:setFrameLength(3)
@@ -233,6 +237,15 @@ function player.Player:updateAnimation()
     end
   end
   
+  if self.drainingEnergy then
+    self.energy = self.energy - 1
+    
+    if self.energy <= 0 then
+      self.energy = 0
+      self.drainingEnergy = false
+    end
+  end
+  
 end
 
 
@@ -276,6 +289,12 @@ function player.Player:nextLeapReadyAnim()
   end
   self.animation:reset()
   
+end
+
+
+--- Starts draining all of the player's energy.
+function player.Player:drainEnergy()
+  self.drainingEnergy = true
 end
 
 

@@ -30,6 +30,8 @@ function slug.Slug:new(startSpace)
     slimedSpaces = {}
   }
   
+  newObj.body.moveDirection = misc.randomDirection()
+  
   graphics.setMultiAnimFrameLength(newObj.idleAnims, 3)
   graphics.setMultiAnimFrameLength(newObj.jumpAnims, 3)
   graphics.setMultiAnimFrameLength(newObj.readyAnims, 3)

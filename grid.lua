@@ -23,11 +23,66 @@ function grid.Grid:new(width, height)
     
     decorCountdown = math.random(1, 3),  -- Countdown towards the next space with a decor
     
-    enemyList = {}
+    enemyList = {},
+    
+    smallTexts = {},
+    bigTexts = {},
   }
 
   self.__index = self
   return setmetatable(newObj, self)
+end
+
+
+--- Returns the y position that would center the current level on the screen.
+function grid.Grid:centerScreenX(tileSize)
+  return math.floor((love.graphics.getWidth() - (self.width * tileSize)) / 2)
+end
+
+
+--- Returns the y position that would center the current level on the screen.
+function grid.Grid:centerScreenY(tileSize)
+  return math.floor((love.graphics.getHeight() - (self.height * tileSize)) / 2)
+end
+
+
+--- Adds text drawn in the small font.
+function grid.Grid:addSmallText(text, pixelX, pixelY)
+  table.insert(self.smallTexts, graphics.Text:new(text, pixelX, pixelY))
+end
+
+
+--- Adds text drawn in the big font.
+function grid.Grid:addBigText(text, pixelX, pixelY)
+  table.insert(self.bigTexts, graphics.Text:new(text, pixelX, pixelY))
+end
+
+
+--- Adds text, center justified on the level.
+function grid.Grid:addCenteredSmallText(text, pixelY)
+  local levelWidth = self.width * 24
+  local textWidth = graphics.tutorialFontSmallest:getWidth(text)
+  local pixelX = (levelWidth - textWidth) / 2
+  self:addSmallText(text, pixelX, pixelY)
+end
+
+
+--- Draws any text attached to the grid.
+function grid.Grid:drawTexts(gridXOffset, gridYOffset, scale)
+  local x
+  local y
+  
+  for index, text in pairs(self.smallTexts) do
+    x = gridXOffset + (text.pixelX * scale)
+    y = gridYOffset + (text.pixelY * scale)
+    text:draw(graphics.tutorialFont, scale, x, y)
+  end
+  
+  for index, text in pairs(self.bigTexts) do
+    x = gridXOffset + (text.pixelX * scale)
+    y = gridYOffset + (text.pixelY * scale)
+    text:draw(graphics.winterFont, scale, x, y)
+  end
 end
 
 
@@ -510,15 +565,14 @@ function grid.Grid:detach(col, row)
   self:addCellSpace(col, row)  -- Creates a new space to fill in the gap
   
   -- If the space used to only be a single cell, then after the cell
-  -- removal it doesn't exist, so don't check for splits in that case.
+  -- removal it doesn't exist, so only check for splits if that's not the case.
   if not oldSpaceIsCell then
     
     -- If the removed cell splits the space, then make it multiple spaces
     self:attemptSplit(oldSpace)
 
   end
-  
-  self:addCellSpace(col, row)  -- Adds a new space in the gap created
+
 end
 
 

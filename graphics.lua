@@ -1,6 +1,11 @@
 local graphics = {}
 
 
+graphics.daysFontSmallest = love.graphics.newFont("m6x11.ttf", 48)
+graphics.winterFontSmallest = love.graphics.newFont("m6x11.ttf", 16)
+graphics.tutorialFontSmallest = love.graphics.newFont("m5x7.ttf", 16)
+
+
 --- Converts a color with 0-255 range to a color with 0-1 range.
 function graphics.convertColor(colorList)
   actualColor = {}
@@ -9,6 +14,27 @@ function graphics.convertColor(colorList)
   end
   return actualColor
 end
+
+
+--- Changes the alpha of the currently selected color.
+function graphics.setAlpha(alpha)
+  local r
+  local g
+  local b
+  
+  r, g, b = love.graphics.getColor()
+  
+  love.graphics.setColor(r, g, b, alpha)
+end
+
+
+--- Loads the fonts used for the game.  Must be called whenever resizing the screen.
+function graphics.reloadFonts(pixel)
+  graphics.daysFont = love.graphics.newFont("m6x11.ttf", 48 * pixel)
+  graphics.winterFont = love.graphics.newFont("m6x11.ttf", 16 * pixel)
+  graphics.tutorialFont = love.graphics.newFont("m5x7.ttf", 16 * pixel)
+end
+
 
 graphics.COLOR_WHITE = graphics.convertColor({255, 255, 255})
 graphics.COLOR_BLACK = graphics.convertColor({0, 0, 0})
@@ -40,6 +66,31 @@ graphics.mask_shader = love.graphics.newShader[[
       return vec4(1.0);
    }
 ]]
+
+
+graphics.Text = {}
+
+--- An object that stores a string, as well as the pixel coordinates of that string.
+function graphics.Text:new(text, pixelX, pixelY)
+  local newObj = {
+    text = text,
+    pixelX = pixelX,
+    pixelY = pixelY,
+  }
+  
+  self.__index = self
+  return setmetatable(newObj, self)
+end
+
+
+--- Draws the text.
+function graphics.Text:draw(font, scale, x, y)
+  x = x or (self.pixelX * scale)
+  y = y or (self.pixelY * scale)
+  love.graphics.setFont(font)
+  love.graphics.print(self.text, x, y)
+end
+
 
 
 graphics.SpriteSheet = {}
@@ -75,7 +126,7 @@ end
 
 --- Draws the sprite.
 function graphics.SpriteSheet:draw(spriteNum, x, y, scale, rotation)
-
+  
   rotation = rotation or 0
   
   local centerX = self.width / 2

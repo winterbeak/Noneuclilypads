@@ -284,6 +284,7 @@ end
 function snake.Snake:canMoveTo(space)
   local restrictedDirection = misc.oppositeOf(self.bodyList[1].moveDirection)
   for direction, spaceList in pairs(self.bodyList[1].space.adjacent) do
+    print(direction)
     if direction ~= restrictedDirection then
       if spaceList[space] then
         return true
@@ -379,8 +380,10 @@ function snake.Snake:drawIdle(bodyNum, gridXOffset, gridYOffset, scale, tileSize
       spriteSheet = snake.idleClockwiseSpriteSheet
       spriteNum = bodyNum - 1
     
+    -- Default to straight if something invalid happens
     else
-      error("This shouldn't happen?  Current direction and previous direction are opposite.")
+      spriteSheet = snake.idleStraightSpriteSheet
+      print("This shouldn't happen?  Current direction and previous direction are opposite.")
     end
   end
   
@@ -427,7 +430,12 @@ function snake.Snake:drawMoving(bodyNum, gridXOffset, gridYOffset, scale, tileSi
     elseif previousDirection == misc.clockwiseTo(currentDirection) then
       animation = self.moveClockwiseAnims[bodyNum - 1]
       
+    -- Default to the moving straight animation in all invalid situations
+    else
+      animation = self.moveStraightAnims[bodyNum]
+      
     end
+    
   end
   
   local cells

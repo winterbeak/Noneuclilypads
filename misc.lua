@@ -1,4 +1,5 @@
 --- Any useful but unsorted functions that I haven't found a good place to put.
+const = require("const")
 
 local misc = {}
 
@@ -82,6 +83,12 @@ function misc.randomChoice(list)
     currentIndex = currentIndex + 1
   end
   
+end
+
+
+--- Randomly returns the string of one of the four directions.
+function misc.randomDirection()
+  return const.DIRECTIONS[math.random(1, #const.DIRECTIONS)]
 end
 
 

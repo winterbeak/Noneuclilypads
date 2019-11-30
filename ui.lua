@@ -2,12 +2,18 @@ graphics = require("graphics")
 
 local ui = {}
 
+FADE_IN = 1
+FADE_OUT = 2
+
+ui.DEFAULT_FADE_LENGTH = 150
+
 ui.energyBarAbove = graphics.SpriteSheet:new("energyBarAbove.png", 1)  -- Above juice on the Z axis
 ui.energyBarBelow = graphics.SpriteSheet:new("energyBarBelow.png", 1)  -- Below juice on the Z axis
 ui.energyPipeIdle = graphics.SpriteSheet:new("energyBarPipeIdle.png", 1)
 ui.energyPipePiping = graphics.SpriteSheet:new("energyBarPipePiping.png", 7)
-ui.energyTopUp = graphics.SpriteSheet:new("energyTopUp.png", 3)
 ui.energyTop = graphics.SpriteSheet:new("energyTop.png", 1)
+ui.energyTopUp = graphics.SpriteSheet:new("energyTopUp.png", 3)
+ui.energyTopDown = graphics.SpriteSheet:new("energyTopDown.png", 3)
 ui.energyColor = graphics.convertColor({22, 148, 0, 0.7 * 255})
 
 ui.hearts = graphics.SpriteSheet:new("hearts.png", 5)
@@ -44,6 +50,72 @@ function ui.updateScreenSize(scale)
 end
 
 
+ui.Fader = {}
+
+--- Stores the values for fading things in and out.
+function ui.Fader:new(minValue, maxValue, length)
+  local newObj = {
+    value = minValue,
+    minValue = minValue,
+    maxValue = maxValue,
+    fadeLength = length,
+    fadeSpeed = (maxValue - minValue) / length,
+    fadingUp = false,
+    fadingDown = false,
+  }
+  
+  self.__index = self
+  return setmetatable(newObj, self)
+end
+
+
+--- Must be called every frame.
+function ui.Fader:update()
+  if self.fadingUp then
+    self.value = self.value + self.fadeSpeed
+    
+    if self.value >= self.maxValue then
+      self.value = self.maxValue
+      self.fadingUp = false
+    end
+  
+  elseif self.fadingDown then
+    self.value = self.value - self.fadeSpeed
+    
+    if self.value < self.minValue then
+      self.value = self.minValue
+      self.fadingDown = false
+    end
+    
+  end
+end
+
+
+--- Starts the fading up to the maximum value.
+function ui.Fader:fadeUp()
+  self.fadingUp = true
+end
+
+
+--- Starts the fading down to the minimum value.
+function ui.Fader:fadeDown()
+  self.fadingDown = true
+end
+
+
+--- Sets the fader's value to the given value.
+function ui.Fader:setValue(value)
+  self.value = value
+end
+
+
+--- Changes how long the fader takes to fade.
+function ui.Fader:setLength(length)
+  self.length = length
+  self.fadeSpeed = (self.maxValue - self.minValue) / length
+end
+
+
 ui.UI = {}
 
 function ui.UI:new(player)
@@ -56,17 +128,24 @@ function ui.UI:new(player)
     energyPipeAnim = nil,
     
     gainingEnergy = false,
+    losingEnergy = false,
     energyTopUpAnim = graphics.Animation:new(ui.energyTopUp),
+    energyTopDownAnim = graphics.Animation:new(ui.energyTopDown),
     energyTopIdleAnim = graphics.Animation:new(ui.energyTop),
     energyTopAnim = nil,
     
-    actualEnergy = player.energy,
-    displayEnergy = player.energy
+    lastFrameEnergy = player.energy,
+    displayEnergy = player.energy,
+    
+    heartVineFader = ui.Fader:new(0, 1, ui.DEFAULT_FADE_LENGTH),
+    energyBarFader = ui.Fader:new(0, 1, ui.DEFAULT_FADE_LENGTH),
+    
   }
   
   newObj.energyPipeAnim = newObj.energyPipeIdleAnim
   newObj.energyTopAnim = newObj.energyTopIdleAnim
 
+  newObj.energyTopDownAnim:setFrameLength(3)
   newObj.energyTopUpAnim:setFrameLength(3)
   newObj.energyPipePipingAnim:setFrameLength(3)
   
@@ -77,6 +156,9 @@ end
 
 function ui.UI:update()
   
+  self.heartVineFader:update()
+  self.energyBarFader:update()
+  
   -- Updates the pipe bulging animation
   if self.pipingEnergy then
     self.energyPipePipingAnim:update()
@@ -84,7 +166,7 @@ function ui.UI:update()
     if self.energyPipePipingAnim.isDone then
       self.pipingEnergy = false
       self.energyPipeAnim = self.energyPipeIdleAnim
-      self.displayEnergy = self.actualEnergy
+      self.displayEnergy = player.energy
       
       self.gainingEnergy = true
       self.energyTopAnim = self.energyTopUpAnim
@@ -92,50 +174,78 @@ function ui.UI:update()
     end
     
   -- Updates the energy rising animation
-  elseif self.gainingEnergy then
-    self.energyTopUpAnim:update()
+  elseif self.gainingEnergy or self.losingEnergy then
+    self.energyTopAnim:update()
     
-    if self.energyTopUpAnim.isDone then
+    if self.energyTopAnim.isDone then
       self.gainingEnergy = false
+      self.losingEnergy = false
       self.energyTopAnim = self.energyTopIdleAnim
     end
     
   end
   
   -- If an increase in energy is detected, play the pipe bulging animation
-  if self.actualEnergy < player.energy then
+  if self.lastFrameEnergy < player.energy then
     self.pipingEnergy = true
     self.energyPipeAnim = self.energyPipePipingAnim
     self.energyPipePipingAnim:reset()
   
-  elseif self.actualEnergy > player.energy then
+  -- If a decrease in energy is detected, play the energy moving down animation
+  elseif self.lastFrameEnergy > player.energy then
+    self.losingEnergy = true
+    self.energyTopAnim = self.energyTopDownAnim
+    self.energyTopAnim:reset()
     self.displayEnergy = player.energy
     
   end
   
-  self.actualEnergy = player.energy
+  self.lastFrameEnergy = player.energy
+
 end
 
 
 function ui.UI:draw(scale)
+  
+  self:drawEnergyBar(scale)
+  self:drawHeartVine(scale)
+  
+end
+
+
+function ui.UI:drawEnergyBar(scale)
+  graphics.setAlpha(self.energyBarFader.value)
+  
   self.energyPipeAnim:draw(0, ui.energyBarPipeY, scale)
   
   ui.energyBarBelow:draw(1, 0, ui.energyBarY, scale)
   
   
+  -- Draws a full energy bar
+  if self.displayEnergy > 84 then
+    local rectX = 5 * scale
+    local rectY = (ui.energyBarY + 99 * scale) - (84 * scale) + (8 * scale)
+    
+    local height = 84 * scale
+    
+    love.graphics.setColor(ui.energyColor)
+    love.graphics.rectangle("fill", rectX, rectY, scale * 14, height)
+    love.graphics.setColor(graphics.COLOR_WHITE)
   
-  
-  
-  -- Draws the energy (unless the player doesn't have any energy)
-  if self.displayEnergy > 0 then
+  -- Draws the energy plus the top of the energy (unless the player doesn't have any energy)
+  elseif self.displayEnergy > 0 then
     
     local energyX = 5 * scale
     local energyY = (ui.energyBarY + 99 * scale) - (self.displayEnergy * scale)
     local rectY = energyY + scale * 8
       
-      -- Draws the rest of the energy one pixel lower if the top-up animation is playing
+    -- Draws the rest of the energy one pixel lower if the top of the energy is rising
     if self.gainingEnergy then
       rectY = rectY + scale
+      
+    -- Draws the top of the energy higher if the energy level is dropping
+    elseif self.losingEnergy then
+      energyY = energyY - scale
     end
   
     self.energyTopAnim:draw(energyX, energyY, scale)
@@ -146,6 +256,12 @@ function ui.UI:draw(scale)
   end
   
   ui.energyBarAbove:draw(1, 0, ui.energyBarY, scale)
+  
+end
+
+
+function ui.UI:drawHeartVine(scale)
+  graphics.setAlpha(self.heartVineFader.value)
   
   ui.heartVine:draw(1, ui.heartVineX, ui.heartVineY, scale)
   for i = 1, player.health do

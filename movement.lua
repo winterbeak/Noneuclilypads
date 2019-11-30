@@ -25,6 +25,10 @@ function movement.Linear:valueAt(frame)
 end
 
 
+function movement.Linear:currentValue()
+  return self:valueAt(self.frame)
+end
+
 
 movement.Sine = {}
 
@@ -72,6 +76,11 @@ end
 
 function movement.Sine:valueAt(frame)
   return self.a * (math.sin(self.k * (frame - self.d))) + self.c
+end
+
+
+function movement.Sine:currentValue()
+  return self:valueAt(self.frame)
 end
 
 

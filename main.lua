@@ -55,17 +55,20 @@ LANDING_LEVEL_DOWN_FRAME = LANDING_WAIT_FRAME + LANDING_LEVEL_DOWN_LENGTH
 LAST_LEVEL_MOVEMENT_FRAME = LANDING_LEVEL_DOWN_FRAME
 
 FREEZE_COLOR = graphics.convertColor({43, 253, 253, 75})
-iceWall = graphics.SpriteSheet:new("iceWall.png", 1)
 
+tutorialTransitioning = false
+tutorialPhase = 0
 
-gridXOffset = 150
-gridYOffset = 50
+iceWallDown = graphics.SpriteSheet:new("iceWallDown.png", 1)
+iceWallUp = graphics.SpriteSheet:new("iceWallUp.png", 1)
+
+gridXOffset = 0
+gridYOffset = 0
 pixel = 3
 tileSize = (pixel * spaces.singlePadsSprite.width)
 showFPS = false
 
-daysFont = love.graphics.newFont("m6x11.ttf", 48 * pixel)
-winterFont = love.graphics.newFont("m6x11.ttf", 16 * pixel)
+graphics.reloadFonts(pixel)
 
 lockMovement = false
   
@@ -78,14 +81,49 @@ mouseDownPreviousFrame = false
 mouseSpace = nil
 
 
-daysLeft = 1  -- Days until winter
+daysLeft = 0  -- Days until winter
+firstLanding = true
+firstLandingTextAlpha = 1
+firstLandingTextX = 0
+firstLandingTextY = 0
+STARTING_DAYS_LEFT = 7  -- How many days left you start with
 
 interface = nil  -- UI
 player = nil  -- Player object
 level = nil  -- Level grid object
 
+onMenu = true
+onTutorial = false
 
---- Changes a few settings for gif recording.
+
+function debugTutorial(phase)
+  onMenu = false
+  onTutorial = true
+  tutorialPhase = phase - 1
+  
+  loadTutorialTransition()
+end
+
+
+--- Changes the pixel multiplier of the screen.
+function changePixel(value)
+  pixel = value
+  tileSize = (pixel * spaces.singlePadsSprite.width)
+  
+  love.window.setMode(267 * pixel, 200 * pixel)
+  
+  ui.updateScreenSize(pixel)
+  
+  graphics.reloadFonts(pixel)
+  
+  -- Centers the level on the screen
+  gridXOffset = math.floor((love.graphics.getWidth() - (level.width * tileSize)) / 2)
+  gridYOffset = math.floor((love.graphics.getHeight() - (level.height * tileSize)) / 2)
+  
+end
+
+
+--- Changeds a few settings for gif recording.
 function gifMode()
   love.window.setMode(450, 300)
   pixel = 3
@@ -150,13 +188,14 @@ function drawDaysLeft(x, y)
     dayString = " DAYS"
   end
   
-  winterX = (daysFont:getWidth(daysLeft .. dayString) - winterFont:getWidth("LEFT UNTIL WINTER")) / 2
-  winterX = math.floor(winterX) + x
+  local daysWidth = graphics.daysFont:getWidth(daysLeft .. dayString)
+  local winterWidth = graphics.winterFont:getWidth("LEFT UNTIL WINTER")
+  winterX = math.floor((daysWidth - winterWidth) / 2) + x
   winterY = y + pixel * 42
   
-  love.graphics.setFont(daysFont)
+  love.graphics.setFont(graphics.daysFont)
   love.graphics.print(daysLeft .. dayString, x, y)
-  love.graphics.setFont(winterFont)
+  love.graphics.setFont(graphics.winterFont)
   love.graphics.print("LEFT UNTIL WINTER", winterX, winterY)
 end
 
@@ -213,15 +252,83 @@ function updateGameplay()
   end
   
   
+  -- If you're on the menu, check if you land on any of the "button" spaces
+  if onMenu and not lockMovement then
+    
+    -- If you land on the "Play" space, start a game
+    if player.body.space == level.spacesGrid[6][1] then
+      loadTakeoffCountdown()
+      daysLeft = STARTING_DAYS_LEFT + 1
+      onMenu = false
+      
+    -- If you land on the "Tutorial" space, start the tutorial
+    elseif player.body.space == level.spacesGrid[9][1] then
+      onMenu = false
+      onTutorial = true
+      loadTutorialTransition()
+      
+    -- If you land on a screen size space, change the screen size
+    else
+      for i = 6, 10 do
+        if player.body.space == level.spacesGrid[i][7] then
+          
+          -- Only update the screen size if the chosen size is different
+          if (i - 5) ~= pixel then
+            changePixel(i - 5)
+          end
+          
+        end
+      end
+    end
+    
+  end
+  
+  
+  -- If we're in the tutorial transition
+  if tutorialTransitioning then
+    
+    -- Moves the previous level down
+    if tutorialMovePrevious.frame < tutorialMovePrevious.length then
+      tutorialMovePrevious.frame = tutorialMovePrevious.frame + 1
+      gridYOffset = tutorialMovePrevious:currentValue()
+      
+      -- If that's done, switch the level
+      if tutorialMovePrevious.frame == tutorialMovePrevious.length then
+        level = tutorialNextLevel
+        gridXOffset = level:centerScreenX(tileSize)
+        
+        -- Places the player at their starting position
+        local startPosition = levelgen.tutorialStartPositions[tutorialPhase]
+        player.body:goTo(level.spacesGrid[startPosition[1]][startPosition[2]])
+      end
+    
+    -- Moves the next level down
+    elseif tutorialMoveCurrent.frame < tutorialMoveCurrent.length then
+      tutorialMoveCurrent.frame = tutorialMoveCurrent.frame + 1
+      gridYOffset = tutorialMoveCurrent:currentValue()
+      
+      -- If that's done, turn the transition off
+      if tutorialMoveCurrent.frame == tutorialMoveCurrent.length then
+        tutorialTransitioning = false
+      end
+      
+    end
+    
+  end
+  
+  
   -- What happens when the mouse is clicked
-  if not lockMovement and mouseReleased and mouseSpace then
+  if not lockMovement and mouseReleased and mouseSpace and not tutorialTransitioning then
     
     local validMove
     local eatFlies
     
     -- If you click on the player's space, start the level transition
     if mouseSpace.occupiedBy == player.body then
-      loadTakeoffCountdown()
+      if not (onMenu or onTutorial) then
+        loadTakeoffCountdown()
+      end
+      
       
     elseif player.body.space.adjacentList[mouseSpace] then
       if mouseSpace:isOccupied() then
@@ -263,6 +370,131 @@ function updateGameplay()
       -- Have all the enemies take their turn
       level:doEnemyTurns(player)
       
+    end
+    
+  end
+  
+  
+  -- Detects tutorial progress conditions
+  if onTutorial and not tutorialTransitioning then
+    
+    -- End of intro
+    if tutorialPhase == 1 then
+      if player.body.space == level.spacesGrid[1][2] then
+        loadTutorialTransition()
+      end
+    
+    -- End of noneuclilypads 1
+    elseif tutorialPhase == 2 then
+      if player.body.space == level.spacesGrid[9][2] then
+        loadTutorialTransition()
+      end
+    
+    -- End of noneuclilypads 2
+    elseif tutorialPhase == 3 then
+      if player.body.space == level.spacesGrid[1][3] then
+        loadTutorialTransition()
+        
+        -- Fades in the hearts ui
+        interface.heartVineFader:setLength(30)
+        interface.heartVineFader:fadeUp()
+      end
+    
+    -- End of intro to enemies
+    elseif tutorialPhase == 4 then
+      if player.body.space == level.spacesGrid[8][2] then
+        loadTutorialTransition()
+        
+        -- Fades in the energy bar ui
+        interface.energyBarFader:setLength(30)
+        interface.energyBarFader:fadeUp()
+      end
+    
+    -- End of intro to fleas
+    elseif tutorialPhase == 5 then
+      if player.body.space == level.spacesGrid[1][3] then
+        
+        -- Check that the player ate all the fleas
+        for rat, _ in pairs(level.enemyList) do
+          if #rat.body.bugs == 0 then
+            loadTutorialTransition()
+            break
+          end
+        end
+        
+      end
+    
+    -- End of fleas 2
+    elseif tutorialPhase == 6 then
+      if player.body.space == level.spacesGrid[9][3] then
+        
+        -- Checks that the player ate enough fleas
+        local totalFleas = 0
+        
+        for rat, _ in pairs(level.enemyList) do
+          totalFleas = totalFleas + #rat.body.bugs
+        end
+        
+        if totalFleas <= 2 then
+          loadTutorialTransition()
+        end
+      end
+      
+    -- End of enemies with noneuclilypads 1
+    elseif tutorialPhase == 7 then
+      if player.body.space == level.spacesGrid[1][3] then
+        
+        -- Check that the player ate all the fleas
+        for rat, _ in pairs(level.enemyList) do
+          if #rat.body.bugs == 0 then
+            loadTutorialTransition()
+            break
+          end
+        end
+        
+      end
+    
+    -- End of enemies with noneuclilypads 2
+    elseif tutorialPhase == 8 then
+      if player.body.space == level.spacesGrid[9][3] then
+        
+        -- Checks that the player ate enough fleas
+        local totalFleas = 0
+        
+        for rat, _ in pairs(level.enemyList) do
+          totalFleas = totalFleas + #rat.body.bugs
+        end
+        
+        if totalFleas <= 2 then
+          loadTutorialTransition()
+        end
+      end
+      
+    -- End of last tutorial phase
+    elseif tutorialPhase == 9 then
+      
+      if not lockMovement and mouseReleased and mouseSpace == player.body.space then
+        loadTakeoffCountdown()
+        
+        daysLeft = STARTING_DAYS_LEFT + 1
+        onTutorial = false
+        tutorialPhase = 0
+        
+        player:drainEnergy()
+      end
+      
+    end
+    
+  end
+  
+  
+  -- Fades out the "Choose a space to land on" text"
+  if firstLanding and not (onMenu or onTutorial) then
+    firstLandingTextAlpha = firstLandingTextAlpha - 0.02
+    
+    if firstLandingTextAlpha < 0 then
+      firstLandingTextAlpha = 0
+      firstLanding = false
     end
     
   end
@@ -324,10 +556,24 @@ function drawGameplay()
   end
   
   -- level:drawDistances(gridXOffset, gridYOffset, tileSize)
+  level:drawTexts(gridXOffset, gridYOffset, pixel)
   level:drawEnemies(gridXOffset, gridYOffset, pixel, tileSize)
   player:draw(gridXOffset + playerXOffset, gridYOffset + playerYOffset, pixel, tileSize)
+  
   interface:draw(pixel)
   
+  love.graphics.setFont(graphics.winterFont)
+  -- love.graphics.print("YOU DIDN'T SURVIVE THE WINTER", pixel * 40, pixel * 30)
+  
+  -- Draws the "choose a space to land on" text
+  if firstLanding and not (onMenu or onTutorial) then
+    local x = firstLandingTextX
+    local y = firstLandingTextY + gridYOffset
+    
+    graphics.setAlpha(firstLandingTextAlpha)
+    love.graphics.setFont(graphics.tutorialFont)
+    love.graphics.print("Choose a space to land on!", x, y)
+  end
 end
 
 
@@ -339,8 +585,6 @@ function loadTakeoffCountdown()
   player.body.moveDirection = "up"
   player.readyingLeap = true
   player:nextLeapReadyAnim()
-  
-
 end
 
 
@@ -359,6 +603,7 @@ function updateTakeoffCountdown()
     if takeoffWaitCount == 3 then
       loadTakeoff()
     else
+      level:updateDistances(player.body.space)
       level:doEnemyTurns(player)
       player:nextLeapReadyAnim()
     end
@@ -373,9 +618,12 @@ function drawTakeoffCountdown()
     space:draw(gridXOffset, gridYOffset, pixel, pixel*2, pixel*2, highlighted)
   end
   
+  level:drawTexts(gridXOffset, gridYOffset, pixel)
   level:drawEnemies(gridXOffset, gridYOffset, pixel, tileSize)
   player:draw(gridXOffset, gridYOffset, pixel, tileSize)
+  
   interface:draw(pixel)
+  
 end
 
 
@@ -386,7 +634,7 @@ function loadTakeoff()
   playerTransitionY = gridYOffset
 
   local first = gridYOffset
-  local last = love.graphics.getHeight()
+  local last = love.graphics.getHeight() + pixel * 40
   local length = TAKEOFF_LEVEL_DOWN_LENGTH
   levelDownMovement = movement.Sine:newFadeIn(first, last, length)
   
@@ -401,12 +649,17 @@ function loadTakeoff()
   TAKEOFF_LEFT = 1
   TAKEOFF_RIGHT = 2
   takeoffVariant = math.random(1, 2)
+  
+  -- Resets fade length to defaults
+  interface.heartVineFader:setLength(ui.DEFAULT_FADE_LENGTH)
+  interface.energyBarFader:setLength(ui.DEFAULT_FADE_LENGTH)
 end
 
 
 function updateTakeoff()
   
   player:updateAnimation()
+  interface:update()
   
   takeoffFrame = takeoffFrame + 1
   
@@ -426,8 +679,13 @@ function updateTakeoff()
     end
     
     playerTransitionY = -pixel * 270
-    
+  
+  -- Fades in the UI (if it isn't already faded in already) when the days left text starts fading in
+  elseif takeoffFrame == TAKEOFF_TEXT_FADE_IN_FRAME then
+    interface.heartVineFader:fadeUp()
+    interface.energyBarFader:fadeUp()
   end
+  
   
   if takeoffFrame < TAKEOFF_WAIT_FRAME then
     level:updateEnemies()
@@ -491,6 +749,7 @@ function drawTakeoff()
       space:draw(gridXOffset, gridYOffset, pixel, pixel*2, pixel*2, highlighted)
     end
     
+    level:drawTexts(gridXOffset, gridYOffset, pixel)
     level:drawEnemies(gridXOffset, gridYOffset, pixel, tileSize)
     
   elseif takeoffFrame < TAKEOFF_PLAYER_DOWN_FRAME then
@@ -532,10 +791,11 @@ end
 function loadChooseSpace()
   phase = CHOOSE_SPACE
   
+  level = levelgen.winterLevel()
   level = levelgen.randomLevel()
   
   local first = -love.graphics.getHeight()
-  local last = math.floor((love.graphics.getHeight() - (level.height * tileSize)) / 2)
+  local last = level:centerScreenY(tileSize)
   local length = LANDING_LEVEL_DOWN_LENGTH
   
   levelDownMovement = movement.Sine:newFadeOut(first, last, length)
@@ -550,6 +810,23 @@ function loadChooseSpace()
   playerLandingSpace = nil
   playerMovement = nil
   player.flailing = false
+  
+  -- Initiates the choose a space text if it's the player's first ever time landing
+  if firstLanding then
+    local textWidth = graphics.tutorialFont:getWidth("Choose a space to land on!")
+    local screenWidth = love.graphics.getWidth()
+    firstLandingTextX = math.floor((screenWidth - textWidth) / 2)
+    
+    if level.height <= 7 then
+      local textHeight = graphics.tutorialFont:getHeight()
+      local levelTop = level:centerScreenY(tileSize)
+      firstLandingTextY = math.floor((levelTop - textHeight) / 2) - levelTop
+    else
+      firstLandingTextY = pixel * 4
+    end
+    
+  end
+  
 end
 
 
@@ -590,6 +867,7 @@ function updateChooseSpace()
         player.landing = true
         lockInput(TURN_DELAY)
         
+        level:updateDistances(player.body.space)
         level:doEnemyTurns(player)
         loadGameplay()
       end
@@ -652,10 +930,22 @@ function drawChooseSpace()
     end
     
   end
-
+  
+  level:drawTexts(gridXOffset, gridYOffset, pixel)
   level:drawEnemies(gridXOffset, gridYOffset, pixel, tileSize)
   player:draw(playerTransitionX, playerTransitionY, pixel, tileSize)
   interface:draw(pixel)
+  
+  -- Draws the "choose a space to land on" text
+  if firstLanding then
+    local x = firstLandingTextX
+    local y = firstLandingTextY + gridYOffset
+    
+    graphics.setAlpha(firstLandingTextAlpha)
+    love.graphics.setFont(graphics.tutorialFont)
+    love.graphics.print("Choose a space to land on!", x, y)
+  end
+  
 end
 
 
@@ -680,7 +970,8 @@ function loadWinter()
   player.flailing = false
   
   winterFrame = 0  -- Starts after the frog lands
-  winterFreezeY = -pixel * 10
+  winterFreezeDownY = -pixel * 24
+  winterFreezeUpY = -pixel * 24
   
   WINTER_START_WAIT_LENGTH = 30
   WINTER_FREEZE_LENGTH = 30
@@ -766,7 +1057,7 @@ function updateWinter()
   if winterFrame < WINTER_START_WAIT_FRAME then
     
   elseif winterFrame < WINTER_FREEZE_FRAME then
-    winterFreezeY = winterFreezeY + 30
+    winterFreezeDownY = winterFreezeDownY + 30
   elseif winterFrame < winterFrozenFrame then
     
     -- Every nine frame, subtract one energy from the player
@@ -776,7 +1067,7 @@ function updateWinter()
     end
   
   elseif winterFrame < winterUnfreezeFrame then
-    winterFreezeY = winterFreezeY - 30
+    winterFreezeUpY = winterFreezeUpY + 30
   end
 end
 
@@ -790,16 +1081,38 @@ function drawWinter()
   interface:draw(pixel)
   
   -- Draws the icy sheet that covers the screen
-  if winterFreezeY > 0 then
+  if winterFreezeDownY > 0 and winterFreezeUpY < love.graphics.getHeight() then
+    local rectY = winterFreezeUpY + (iceWallUp.singleHeight * pixel)
+    local height = winterFreezeDownY - rectY
+    
     love.graphics.setColor(FREEZE_COLOR)
-    love.graphics.rectangle("fill", 0, 0, love.graphics.getWidth(), winterFreezeY)
+    love.graphics.rectangle("fill", 0, rectY, love.graphics.getWidth(), height)
+    
     love.graphics.setColor(graphics.COLOR_WHITE)
-    iceWall:draw(1, 0, winterFreezeY, pixel)
+    iceWallDown:draw(1, 0, winterFreezeDownY, pixel)
+    iceWallUp:draw(1, 0, winterFreezeUpY, pixel)
   end
   
   love.graphics.print("" .. winterFrame, 0, 0)
   love.graphics.print("" .. player.energy, 0, 100)
 end
+
+
+function loadTutorialTransition()
+  tutorialTransitioning = true
+  tutorialPhase = tutorialPhase + 1
+  
+  tutorialNextLevel = levelgen.tutorialLevelGenerators[tutorialPhase]()
+  
+  local first = gridYOffset
+  local last = love.graphics.getHeight() + pixel * 50
+  tutorialMovePrevious = movement.Sine:newFadeIn(first, last, 45)
+  
+  first = -love.graphics.getHeight() - pixel * 50
+  last = tutorialNextLevel:centerScreenY(tileSize)
+  tutorialMoveCurrent = movement.Sine:newFadeOut(first, last, 70)
+end
+
 
 
 --- Runs when the game is started.
@@ -812,29 +1125,22 @@ function love.load()
   
   love.graphics.setBackgroundColor(graphics.COLOR_WATER)
   
-  level = levelgen.randomLevel()
+  level = levelgen.menuLevel()
+  -- level = levelgen.randomLevel()
   
   -- Centers the level on the screen
-  gridXOffset = math.floor((love.graphics.getWidth() - (level.width * tileSize)) / 2)
-  gridYOffset = math.floor((love.graphics.getHeight() - (level.height * tileSize)) / 2)
+  gridXOffset = level:centerScreenX(tileSize)
+  gridYOffset = level:centerScreenY(tileSize)
   
   --level:addEnemy(entities.Rat:new(level.spacesGrid[5][4]))
   --level:addEnemy(entities.Snake:newRandom(level.spacesGrid[5][5]))
   --level:addEnemy(entities.Snake:newRandom(level.spacesGrid[6][7]))
   --level:addEnemy(entities.Slug:new(level.spacesGrid[7][1]))
   
-  local startSpace
-  while true do
-    space = misc.randomChoice(level.spacesList)
-    
-    if not space:isOccupied() then
-      player = entities.Player:new(space)
-      break
-    end
-    
-  end
+  player = entities.Player:new(level.spacesGrid[8][4])
   
   interface = ui.UI:new(player)
+  
   ui.updateScreenSize(pixel)
   
   level:updateDistances(player.body.space)
@@ -842,7 +1148,9 @@ function love.load()
   -- Tracks fps
   totalTime = 0
   totalFrames = 0
-
+  
+  -- Starts the game with the tutorial on the given phase
+  -- debugTutorial(9)
 end
 
 

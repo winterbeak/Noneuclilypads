@@ -230,13 +230,19 @@ function bodies.WarpBody:new(startSpace)
 end
 
 
---- Makes the body move to a given space.
-function bodies.WarpBody:moveTo(space, direction)
+--- Makes the body go to a different space without updating any of the movement animation stuff.
+function bodies.WarpBody:goTo(space)
   self.space.occupiedBy = nil
   space.occupiedBy = self
   
   self.previousSpace = self.space
   self.space = space
+end
+
+
+--- Makes the body move to a given space.
+function bodies.WarpBody:moveTo(space, direction)
+  self:goTo(space)
   
   self.moveDirection = direction
   self.moving = true

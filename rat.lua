@@ -26,6 +26,8 @@ function rat.Rat:new(startSpace)
     body = bodies.WarpBody:new(startSpace),
   }
   
+  newObj.body.moveDirection = misc.randomDirection()
+  
   newObj.idleAnim2:setFrameLength(6)
   newObj.jumpAnim:setFrameLength(3)
   

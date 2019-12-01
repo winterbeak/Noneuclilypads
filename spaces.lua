@@ -320,6 +320,25 @@ function spaces.Space:directionOf(space)
 end
 
 
+--- Returns the direction of a space adjacent to this one, restricting a certain direction.
+-- If the space is not adjacent, nil is returned.
+-- If the space is only adjacent in the restricted direction, nil is returned.
+-- If the space is touching more than one directions, then the priority order
+-- is left, up, right, down.
+function spaces.Space:directionOfRestricted(space, restrictedDirection)
+  for direction, spaceList in pairs(self.adjacent) do
+    if direction ~= restrictedDirection then
+      if spaceList[space] then
+        return direction
+      end
+    end
+  end
+  
+  return nil
+end
+
+
+
 --- Adds slime to the space.
 -- If one of the directions is left as nil, then it will not be changed.
 function spaces.Space:addSlime(direction1, direction2)

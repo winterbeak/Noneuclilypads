@@ -16,13 +16,14 @@ ui.energyTopUp = graphics.SpriteSheet:new("energyTopUp.png", 3)
 ui.energyTopDown = graphics.SpriteSheet:new("energyTopDown.png", 3)
 ui.energyColor = graphics.convertColor({22, 148, 0, 0.7 * 255})
 
-ui.hearts = graphics.SpriteSheet:new("hearts.png", 5)
+ui.hearts = graphics.loadMulti("heart", 5, ".png", 1)
+ui.heartsExplosion = graphics.loadMulti("heartExplosion", 5, ".png", 5)
 ui.heartVine = graphics.SpriteSheet:new("heartVine.png", 1)
 
 ui.heartVineX = 0
 ui.heartVineY = 0
-ui.heartX = {6, 13, 5, 10, 3}
-ui.heartY = {24, 40, 56, 72, 88}
+ui.heartX = {3, 10, 2, 7, 0}
+ui.heartY = {22, 38, 54, 70, 86}
 
 ui.energyBarX = 0
 ui.energyBarY = 0
@@ -40,8 +41,8 @@ function ui.updateScreenSize(scale)
   ui.heartVineX = love.graphics.getWidth() - (24 * scale)
   ui.heartVineY = math.floor((love.graphics.getHeight() - (ui.heartVine.singleHeight * scale)) / 2)
   
-  ui.heartX = {6, 13, 5, 10, 3}
-  ui.heartY = {24, 40, 56, 72, 88}
+  ui.heartX = {3, 10, 2, 7, 0}
+  ui.heartY = {22, 38, 54, 70, 86}
   for i = 1, #ui.heartX do
     ui.heartX[i] = ui.heartX[i] * scale
     ui.heartY[i] = ui.heartY[i] * scale
@@ -137,6 +138,12 @@ function ui.UI:new(player)
     lastFrameEnergy = player.energy,
     displayEnergy = player.energy,
     
+    heartsIdleAnims = graphics.multiAnim(ui.hearts),
+    heartsExplosionAnims = graphics.multiAnim(ui.heartsExplosion),
+    heartsExploding = {false, false, false, false, false},
+    heartsGone = {false, false, false, false, false},
+    
+    lastFrameHealth = player.health,
     displayHealth = player.health,
     
     heartVineFader = ui.Fader:new(0, 1, ui.DEFAULT_FADE_LENGTH),
@@ -150,6 +157,8 @@ function ui.UI:new(player)
   newObj.energyTopDownAnim:setFrameLength(3)
   newObj.energyTopUpAnim:setFrameLength(3)
   newObj.energyPipePipingAnim:setFrameLength(3)
+  
+  graphics.setMultiAnimFrameLength(newObj.heartsExplosionAnims, 4)
   
   self.__index = self
   return setmetatable(newObj, self)
@@ -187,6 +196,19 @@ function ui.UI:update()
     
   end
   
+  for i = 1, 5 do
+    if self.heartsExploding[i] then
+      self.heartsExplosionAnims[i]:update()
+      
+      if self.heartsExplosionAnims[i].isDone then
+        self.heartsExplosionAnims[i]:reset()
+        self.heartsGone[i] = true
+        self.heartsExploding[i] = false
+      end
+    end
+  end
+  
+  
   -- If an increase in energy is detected, play the pipe bulging animation
   if self.lastFrameEnergy < self.player.energy then
     self.pipingEnergy = true
@@ -202,7 +224,20 @@ function ui.UI:update()
     
   end
   
+  if self.lastFrameHealth > self.player.health then
+    for i = self.player.health + 1, self.lastFrameHealth do
+      self.heartsExploding[i] = true
+    end
+    
+  elseif self.lastFrameHealth < self.player.health then
+    for i = self.lastFrameHealth, self.player.health do
+      self.heartsExploding[i] = false
+      self.heartsGone[i] = false
+    end
+  end
+  
   self.displayHealth = self.player.health
+  self.lastFrameHealth = self.player.health
   self.lastFrameEnergy = self.player.energy
 
 end
@@ -266,8 +301,20 @@ function ui.UI:drawHeartVine(scale)
   graphics.setAlpha(self.heartVineFader.value)
   
   ui.heartVine:draw(1, ui.heartVineX, ui.heartVineY, scale)
-  for i = 1, self.player.health do
-    ui.hearts:draw(i, ui.heartVineX + ui.heartX[i], ui.heartVineY + ui.heartY[i], scale)
+  
+  local x
+  local y
+  for i = 1, 5 do
+    x = ui.heartVineX + ui.heartX[i]
+    y = ui.heartVineY + ui.heartY[i]
+      
+    if self.heartsExploding[i] then
+      self.heartsExplosionAnims[i]:draw(x, y, scale)
+      
+    elseif not self.heartsGone[i] then
+      self.heartsIdleAnims[i]:draw(x, y, scale)
+      
+    end
   end
 end
 

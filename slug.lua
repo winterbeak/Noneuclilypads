@@ -8,6 +8,7 @@ slug.jumpOffsets = {0, 0, 5, 21, 24, 24, 24, 24, 24}
 slug.idleSpriteSheets = graphics.loadMulti("slugIdle", 4, ".png", 1)
 slug.jumpSpriteSheets = graphics.loadMulti("slugJump", 3, ".png", 9)
 slug.readySpriteSheets = graphics.loadMulti("slugReady", 3, ".png", 27)
+slug.attackSpriteSheets = graphics.loadMulti("slugAttack", 3, ".png", 4)
 slug.slurpSpriteSheet = graphics.SpriteSheet:new("slugSlurp.png", 7)
 
 slug.Slug = {}
@@ -21,7 +22,10 @@ function slug.Slug:new(startSpace)
     idleAnims = graphics.multiAnim(slug.idleSpriteSheets),
     jumpAnims = graphics.multiAnim(slug.jumpSpriteSheets),
     readyAnims = graphics.multiAnim(slug.readySpriteSheets),
+    attackAnims = graphics.multiAnim(slug.attackSpriteSheets),
     slurpAnim = graphics.Animation:new(slug.slurpSpriteSheet),
+    
+    attacking = false,
     
     moveTimer = math.random(0, 1),
     animation = nil,
@@ -35,6 +39,7 @@ function slug.Slug:new(startSpace)
   graphics.setMultiAnimFrameLength(newObj.idleAnims, 3)
   graphics.setMultiAnimFrameLength(newObj.jumpAnims, 3)
   graphics.setMultiAnimFrameLength(newObj.readyAnims, 3)
+  graphics.setMultiAnimFrameLength(newObj.attackAnims, 3)
   newObj.slurpAnim:setFrameLength(3)
   
   if newObj.moveTimer == 0 then
@@ -113,6 +118,9 @@ function slug.Slug:takeTurn(level, player)
     -- If the snail is beside the player, hurt them
     if self.body:isBesideBody(player.body) then
       player:hurt()
+      self.animation = self.attackAnims[self.moveTimer / 2]
+      self.attacking = true
+      self.body.moveDirection = self.body.space:directionOf(player.body.space)
       
     -- Otherwise, just move normally
     else
@@ -209,6 +217,16 @@ function slug.Slug:updateAnimation()
   -- Slurp animation
   elseif self.animation == self.slurpAnim then
     self.animation:update()
+    
+  -- Attack animation
+  elseif self.attacking then
+    self.animation:update()
+    
+    if self.animation.isDone then
+      self.animation:reset()
+      self.animation = self.idleAnims[(self.moveTimer / 2) + 1]
+      self.attacking = false
+    end
     
   elseif self.moveTimer % 2 == 1 and self.moveTimer ~= 7 then
     self.animation:update()

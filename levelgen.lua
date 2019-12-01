@@ -29,7 +29,7 @@ function levelgen.testingLevel()
   level:mergeCoordinates(6, 3, 6, 4)
 
   level:refreshAllAdjacent()
-  level:populate(3)
+  --level:populate(3)
   
   return level
   
@@ -181,14 +181,14 @@ function levelgen.menuLevel()
   level:addSmallText("Play", 134, 4)
   level:addSmallText("Tutorial", 196, 4)
   level:addSmallText("Screen Size", 150, 168)
-  level:addBigText("Click to move.", 12, 103)
+  level:addBigText("Click to move.", 14, 103)
   level:addSmallText("x1", 126, 148)
   level:addSmallText("x2", 150, 148)
   level:addSmallText("x3", 174, 148)
   level:addSmallText("x4", 198, 148)
   level:addSmallText("x5", 222, 148)
   
-  level:refreshAllAdjacent();
+  level:refreshAllAdjacent()
   
   return level
 end

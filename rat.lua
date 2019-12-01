@@ -5,9 +5,11 @@ misc = require("misc")
 local rat = {}
 
 rat.jumpOffsets = {0, 0, 0, 7, 25, 29, 29, 29}
+
 rat.idle1SpriteSheet = graphics.SpriteSheet:new("ratIdle1.png", 1)
 rat.idle2SpriteSheet = graphics.SpriteSheet:new("ratIdle2.png", 12)
 rat.jumpSpriteSheet = graphics.SpriteSheet:new("ratJump.png", 8)
+rat.attackSpriteSheet = graphics.SpriteSheet:new("ratAttack.png", 6)
 
 
 rat.Rat = {}
@@ -19,6 +21,9 @@ function rat.Rat:new(startSpace)
     idleAnim1 = graphics.Animation:new(rat.idle1SpriteSheet),
     idleAnim2 = graphics.Animation:new(rat.idle2SpriteSheet),
     jumpAnim = graphics.Animation:new(rat.jumpSpriteSheet),
+    attackAnim = graphics.Animation:new(rat.attackSpriteSheet),
+    
+    attacking = false,
     
     moveTimer = math.random(0, 1),
     animation = nil,
@@ -30,6 +35,7 @@ function rat.Rat:new(startSpace)
   
   newObj.idleAnim2:setFrameLength(6)
   newObj.jumpAnim:setFrameLength(3)
+  newObj.attackAnim:setFrameLength(3)
   
   if newObj.moveTimer == 0 then
     newObj.animation = newObj.idleAnim1
@@ -75,6 +81,9 @@ function rat.Rat:takeTurn(level, player)
     -- If the rat is beside the player, hurt them
     if self.body:isBesideBody(player.body) then
       player:hurt()
+      self.animation = self.attackAnim
+      self.attacking = true
+      self.body.moveDirection = self.body.space:directionOf(player.body.space)
       
     -- Otherwise, just move normally
     else
@@ -139,8 +148,12 @@ end
 
 --- Updates the rat's animation.  Should be called every frame.
 function rat.Rat:updateAnimation()
+  
   -- Jump animation
   if self.body.moving then
+    self.animation:update()
+    
+  elseif self.attacking then
     self.animation:update()
     
   -- Second idle animation
@@ -154,8 +167,10 @@ function rat.Rat:updateAnimation()
   
   if self.animation.isDone then
     self.jumpAnim:reset()
+    self.attackAnim:reset()
     self.animation = self.idleAnim1
     self.body.moving = false
+    self.attacking = false
   end
   
   self.body:updateBugs()

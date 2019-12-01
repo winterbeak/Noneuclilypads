@@ -19,6 +19,10 @@ snake.moveCounterClockwiseSpriteSheets = graphics.loadMulti("snake", 4, "MoveCou
 snake.tailWaggle1SpriteSheet = graphics.SpriteSheet:new("snakeTailWaggle1.png", 8)
 snake.tailWaggle2SpriteSheet = graphics.SpriteSheet:new("snakeTailWaggle2.png", 5)
 
+snake.attackStraightSpriteSheet = graphics.SpriteSheet:new("snakeAttackStraight.png", 6)
+snake.attackClockwiseSpriteSheet = graphics.SpriteSheet:new("snakeAttackClockwise.png", 7)
+snake.attackCounterClockwiseSpriteSheet = graphics.SpriteSheet:new("snakeAttackCounterClockwise.png", 7)
+
 
 snake.Snake = {}
 
@@ -29,6 +33,11 @@ function snake.Snake:new(spaceList, directionList)
   
   local newObj = {
     moveTimer = math.random(0, 2),
+    
+    headAnimation = nil,
+    attackStraightAnim = graphics.Animation:new(snake.attackStraightSpriteSheet),
+    attackClockwiseAnim = graphics.Animation:new(snake.attackClockwiseSpriteSheet),
+    attackCounterClockwiseAnim = graphics.Animation:new(snake.attackCounterClockwiseSpriteSheet),
     
     tailAnimation = nil,
     idleAnim1 = graphics.Animation:new(snake.tailWaggle1SpriteSheet),
@@ -52,6 +61,10 @@ function snake.Snake:new(spaceList, directionList)
   
   newObj.idleAnim1:setFrameLength(6)
   newObj.idleAnim2:setFrameLength(4)
+  
+  newObj.attackStraightAnim:setFrameLength(3)
+  newObj.attackClockwiseAnim:setFrameLength(3)
+  newObj.attackCounterClockwiseAnim:setFrameLength(3)
   
   graphics.setMultiAnimFrameLength(newObj.moveStraightAnims, 3)
   graphics.setMultiAnimFrameLength(newObj.moveClockwiseAnims, 3)
@@ -259,7 +272,7 @@ function snake.Snake:move(player)
     -- Note that the tail always takes the direction of the previous part.
     local body
     nextSpace = closestSpace
-    nextDirection = self.bodyList[1].space:directionOf(nextSpace)
+    nextDirection = self.bodyList[1].space:directionOfRestricted(nextSpace, restricted)
     for i = 1, snake.LENGTH do
       body = self.bodyList[i]
       
@@ -284,12 +297,18 @@ end
 function snake.Snake:canMoveTo(space)
   local restrictedDirection = misc.oppositeOf(self.bodyList[1].moveDirection)
   for direction, spaceList in pairs(self.bodyList[1].space.adjacent) do
-    print("Snake direction:" .. direction)
+    
     if direction ~= restrictedDirection then
+      -- print("Snake direction: ", direction, restrictedDirection, "ALLOWED")
       if spaceList[space] then
         return true
       end
+      
+    -- else
+      -- print("Snake direction: ", direction, restrictedDirection, "NOT ALLOWED")
+      
     end
+    
   end
 end
 
@@ -315,6 +334,17 @@ function snake.Snake:takeTurn(level, player)
     if self:canMoveTo(player.body.space) then
       player:hurt()
       
+      -- Play the corresponding attack animation
+      local headDirection = self.bodyList[1].moveDirection
+      local playerDirection = self.bodyList[1].space:directionOf(player.body.space)
+      if playerDirection == headDirection then
+        self.headAnimation = self.attackStraightAnim
+      elseif playerDirection == misc.clockwiseTo(headDirection) then
+        self.headAnimation = self.attackClockwiseAnim
+      elseif playerDirection == misc.counterClockwiseTo(headDirection) then
+        self.headAnimation = self.attackCounterClockwiseAnim
+      end
+      
     -- Otherwise, just move normally
     else
       self:move(player)
@@ -336,6 +366,23 @@ function snake.Snake:drawIdle(bodyNum, gridXOffset, gridYOffset, scale, tileSize
   
   -- Head is always drawn straight
   if bodyNum == 1 then
+    
+    -- Draws the attacking animation
+    if self.headAnimation then
+      rotation = misc.rotationOf(self.bodyList[bodyNum].moveDirection)
+      
+      for colNum, col in pairs(self.bodyList[bodyNum].space.cells) do
+        for rowNum, _ in pairs(col) do
+          x = gridXOffset + ((colNum - 1) * tileSize)
+          y = gridYOffset + ((rowNum - 1) * tileSize)
+          
+          self.headAnimation:draw(x, y, scale, rotation)
+        end
+      end
+      
+      return
+    end
+      
     spriteSheet = snake.idleStraightSpriteSheet
     spriteNum = bodyNum
     
@@ -512,6 +559,16 @@ function snake.Snake:updateAnimation()
     -- Update's the tail's direction, as it faces a different direction during
     -- the animation
     self.bodyList[snake.LENGTH].moveDirection = self.bodyList[snake.LENGTH - 1].moveDirection
+  end
+  
+  if self.headAnimation then
+    self.headAnimation:update()
+    
+    if self.headAnimation.isDone then
+      self.headAnimation:reset()
+      self.headAnimation = nil
+      
+    end
   end
   
   for i = 1, snake.LENGTH do

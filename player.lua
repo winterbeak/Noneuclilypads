@@ -22,6 +22,11 @@ player.leapLandingSpriteSheet = graphics.SpriteSheet:new("frogLeapLanding.png", 
 player.tongueBase = graphics.SpriteSheet:new("frogTongueBase.png", 9)
 player.tongueTip = graphics.SpriteSheet:new("frogTongueTip.png", 9)
 
+player.slashSpriteSheets = graphics.loadMulti("slash", 4, ".png", 5)
+
+player.dyingSpriteSheet = graphics.SpriteSheet:new("frogDying.png", 5)
+player.deadSpriteSheet = graphics.SpriteSheet:new("frogDead.png", 1)
+
 player.Player = {}
 
 --- Constructor.  Creates a new Player, who is a frog that can jump around.
@@ -44,6 +49,15 @@ function player.Player:new(startSpace)
     leapLandingReadyAnim = graphics.Animation:new(player.leapLandingReadySpriteSheet),
     leapLandingAnim = graphics.Animation:new(player.leapLandingSpriteSheet),
     landing = false,
+    
+    slashAnims = graphics.multiAnim(player.slashSpriteSheets),
+    slashAnimNum = 0,
+    gettingHurt = false,
+    
+    hasDied = false,
+    dyingAnim = graphics.Animation:new(player.dyingSpriteSheet),
+    deadAnim = graphics.Animation:new(player.deadSpriteSheet),
+    dying = false,
     
     animation = nil,
     
@@ -75,6 +89,10 @@ function player.Player:new(startSpace)
   newObj.flailAnim:setFrameLength(2)
   
   newObj.leapLandingAnim:setFrameLength(4)
+  
+  newObj.dyingAnim:setFrameLength(3)
+  
+  graphics.setMultiAnimFrameLength(newObj.slashAnims, 4)
   
   newObj.animation = newObj.idleAnim
   
@@ -135,6 +153,11 @@ function player.Player:draw(gridXOffset, gridYOffset, scale, tileSize)
         self.animation:drawShifted(x, y, forwardsShift, 0, scale, rotation)
       else
         self.animation:draw(x, y, scale, rotation)
+      end
+      
+      -- Draws the slash when the player is getting hurt
+      if self.gettingHurt then
+        self.slashAnims[self.slashAnimNum]:draw(x, y, scale)
       end
 
     end
@@ -237,6 +260,30 @@ function player.Player:updateAnimation()
     end
   end
   
+  if self.gettingHurt then
+    self.slashAnims[self.slashAnimNum]:update()
+    
+    if self.slashAnims[self.slashAnimNum].isDone then
+      self.gettingHurt = false
+      self.slashAnims[self.slashAnimNum]:reset()
+    end
+  end
+  
+  if not self.body.moving and self.dying then
+    if self.animation ~= self.dyingAnim then
+      self.animation = self.dyingAnim
+      
+    else
+      self.dyingAnim:update()
+      
+      if self.dyingAnim.isDone then
+        self.dying = false
+        self.dyingAnim:reset()
+        self.animation = self.deadAnim
+      end
+    end
+  end
+  
   if self.drainingEnergy then
     self.energy = self.energy - 1
     
@@ -274,6 +321,14 @@ end
 --- Hurts the player.
 function player.Player:hurt()
   self.health = self.health - 1
+  self.gettingHurt = true
+  self.slashAnimNum = math.random(1, #self.slashAnims)
+  
+  if self.health <= 0 then
+    self.dying = true
+    self.hasDied = true
+  end
+  
 end
 
 

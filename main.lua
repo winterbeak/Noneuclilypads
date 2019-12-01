@@ -108,6 +108,9 @@ continueTextX = 0
 continueTextY = 0
 
 takeoffFromWinter = false
+takeoffFromMenu = false
+
+title = graphics.SpriteSheet:new("title.png", 1)
 
 
 function debugTutorial(phase)
@@ -248,6 +251,10 @@ end
 
 function loadGameplay()
   phase = GAMEPLAY
+  
+  deadFrame = 0
+  YOU_DIED_FRAME = 120
+  CLICK_FOR_MENU_FRAME = 240
 end
 
 
@@ -269,6 +276,38 @@ function updateGameplay()
   end
   
   
+  -- Updates the player dead timer
+  if player.hasDied then
+    deadFrame = deadFrame + 1
+  end
+  
+  if not screenTransition.activated and deadFrame >= CLICK_FOR_MENU_FRAME + 30 then
+    if mouseReleased then
+      screenTransition:start()
+    end
+    
+  elseif screenTransition.activated and (not onTutorial) then
+    if screenTransition.middleFrame then
+      onMenu = true
+      level = levelgen.menuLevel()
+      
+      -- Centers the level on the screen
+      gridXOffset = level:centerScreenX(tileSize)
+      gridYOffset = level:centerScreenY(tileSize)
+      
+      player.body:goTo(level.spacesGrid[8][4])
+      player.animation = player.idleAnim
+      player.health = 5
+      player.energy = 0
+      player.hasDied = false
+      deadFrame = 0
+  
+      interface.energyBarFader:setValue(0)
+      interface.heartVineFader:setValue(0)
+    end
+  end
+  
+  
   -- If you're on the menu, check if you land on any of the "button" spaces
   if onMenu and not lockMovement then
     
@@ -276,12 +315,14 @@ function updateGameplay()
     if player.body.space == level.spacesGrid[6][1] then
       loadTakeoffCountdown()
       daysLeft = STARTING_DAYS_LEFT + 1
+      takeoffFromMenu = true
       onMenu = false
       
     -- If you land on the "Tutorial" space, start the tutorial
     elseif player.body.space == level.spacesGrid[9][1] then
       onMenu = false
       onTutorial = true
+      tutorialShowTitle = true
       loadTutorialTransition()
       
     -- If you land on a screen size space, change the screen size
@@ -321,6 +362,9 @@ function updateGameplay()
         
         -- Removes the reset button
         tutorialResetButton = nil
+        
+        -- Hides the title
+        tutorialShowTitle = false
       end
     
     -- Moves the next level down
@@ -340,9 +384,10 @@ function updateGameplay()
   
   -- What happens when the mouse is clicked
   local movementAttempted = mouseReleased and mouseSpace
-  local lockedMovement = lockMovement or tutorialTransitioning or screenTransition.activated
+  local lockedMovement = lockMovement or player.hasDied
+  local inTransition = tutorialTransitioning or screenTransition.activated
   
-  if movementAttempted and not lockedMovement then
+  if movementAttempted and not (lockedMovement or inTransition) then
     
     local validMove
     local eatFlies
@@ -416,6 +461,9 @@ function updateGameplay()
         
         player.health = 5
         player.energy = 0
+        player.animation = player.idleAnim
+        player.hasDied = false
+        deadFrame = 0
         
         level = levelgen.tutorialLevelGenerators[tutorialPhase]()
         
@@ -539,6 +587,7 @@ function updateGameplay()
         tutorialPhase = 0
         
         player:drainEnergy()
+        player.health = 5
       end
       
     end
@@ -588,7 +637,10 @@ function drawGameplay()
   for space, _ in pairs(level.spacesList) do
     highlighted = false
     
-    if space.isButton and mouseSpace == space then
+    if player.hasDied then
+      -- Keep highlighted as false
+      
+    elseif space.isButton and mouseSpace == space then
       highlighted = true
       
     elseif space.occupiedBy == player.body then
@@ -651,12 +703,34 @@ function drawGameplay()
     love.graphics.print("Choose a space to land on!", x, y)
   end
   
+  love.graphics.setColor(graphics.COLOR_WHITE)
+  
+  -- Draws the logo on the main menu
+  if onMenu or tutorialShowTitle then
+    title:draw(1, gridXOffset + pixel * 4, gridYOffset + pixel * 20, pixel)
+  end
+  
+  -- Draws the text on the tutorial reset button
   if tutorialResetButton then
     love.graphics.setFont(graphics.tutorialFont)
-    love.graphics.setColor(graphics.COLOR_WHITE)
-    
     love.graphics.print("Reset", gridXOffset + pixel * 94, gridYOffset + pixel * 148)
   end
+  
+  -- Draws the text when you die
+  if deadFrame >= YOU_DIED_FRAME then
+    love.graphics.setColor({0, 0, 0, 0.3})
+    love.graphics.rectangle("fill", 0, 0, love.graphics.getWidth(), love.graphics.getHeight())
+    
+    love.graphics.setColor(graphics.COLOR_WHITE)
+    love.graphics.setFont(graphics.winterFont)
+    love.graphics.print("YOU DIED!", pixel * 105, pixel * 46)
+  end
+  
+  if deadFrame >= CLICK_FOR_MENU_FRAME then
+    love.graphics.setFont(graphics.tutorialFont)
+    love.graphics.print("Click anywhere to return to the menu.", pixel * 34, pixel * 140)
+  end
+  
 end
 
 
@@ -688,7 +762,13 @@ function updateTakeoffCountdown()
     else
       level:updateDistances(player.body.space)
       level:doEnemyTurns(player)
-      player:nextLeapReadyAnim()
+      if player.hasDied then
+        print(player.dyingAnim, player.animation)
+        player.readyingLeap = false
+        loadGameplay()
+      else
+        player:nextLeapReadyAnim()
+      end
     end
     
   end
@@ -706,6 +786,10 @@ function drawTakeoffCountdown()
   -- Draws the winter text on the winter level
   if takeoffFromWinter then
     drawWinterText()
+  end
+  
+  if takeoffFromMenu then
+    title:draw(1, gridXOffset + pixel * 4, gridYOffset + pixel * 20, pixel)
   end
   
   level:drawEnemies(gridXOffset, gridYOffset, pixel, tileSize)
@@ -847,7 +931,10 @@ function drawTakeoff()
     if takeoffFromWinter then
       drawWinterText()
     end
-  
+    if takeoffFromMenu then
+      title:draw(1, gridXOffset + pixel * 4, gridYOffset + pixel * 20, pixel)
+    end
+    
     level:drawEnemies(gridXOffset, gridYOffset, pixel, tileSize)
     
   elseif takeoffFrame < TAKEOFF_PLAYER_DOWN_FRAME then
@@ -927,6 +1014,7 @@ function loadChooseSpace()
   
   -- After the takeoff is done, then the takeoff stops being from winter.
   takeoffFromWinter = false
+  takeoffFromMenu = false
   
 end
 
@@ -1354,6 +1442,8 @@ function love.load()
   
   love.graphics.setBackgroundColor(graphics.COLOR_WATER)
   
+  loadGameplay()
+  
   level = levelgen.menuLevel()
   -- level = levelgen.randomLevel()
   
@@ -1362,10 +1452,6 @@ function love.load()
   interface = ui.UI:new(player)
   ui.updateScreenSize(pixel)
   
-  --level:addEnemy(entities.Rat:new(level.spacesGrid[5][4]))
-  --level:addEnemy(entities.Snake:newRandom(level.spacesGrid[5][5]))
-  --level:addEnemy(entities.Snake:newRandom(level.spacesGrid[6][7]))
-  --level:addEnemy(entities.Slug:new(level.spacesGrid[7][1]))
   -- level:updateDistances(player.body.space)
   
   -- Centers the level on the screen
@@ -1375,6 +1461,27 @@ function love.load()
   -- Tracks fps
   totalTime = 0
   totalFrames = 0
+  
+  
+  --[[
+  -- Starts the game on a level.
+  onMenu = false
+  
+  level = levelgen.testingLevel()
+  --level:addEnemy(entities.Rat:new(level.spacesGrid[5][4]))
+  --level:addEnemy(entities.Snake:newRandom(level.spacesGrid[5][5]))
+  --level:addEnemy(entities.Snake:newRandom(level.spacesGrid[6][7]))
+  level:addEnemy(entities.Slug:new(level.spacesGrid[7][1]))
+  
+  player.body:goTo(level.spacesGrid[2][2])
+  
+  interface.energyBarFader:setValue(1)
+  interface.heartVineFader:setValue(1)
+  
+  gridXOffset = level:centerScreenX(tileSize)
+  gridYOffset = level:centerScreenY(tileSize)
+  ]]
+  
   
   -- Starts the game on the winter phase
   -- onMenu = false

@@ -114,7 +114,7 @@ takeoffFromMenu = false
 title = graphics.SpriteSheet:new("title.png", 1)
 
 
-music = sound.FadableSound:new("ambience.flac", 0.6, true)
+music = sound.FadableSound:new("ambience.ogg", 0.6, true)
 music:play()
 
 

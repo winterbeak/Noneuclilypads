@@ -33,7 +33,7 @@ ui.energyBarPipeY = 0
 
 
 ui.energyBarUpSound = sound.SoundSet:new("energyBarUp", 3, ".ogg", 1)
-ui.loseHeartSound = sound.SoundSet:new("loseHeart", 1, ".ogg", 0.08)
+ui.loseHeartSound = sound.SoundSet:new("loseHeart", 1, ".ogg", 0.07)
 
 
 --- Updates the size and position of all of the sprites.

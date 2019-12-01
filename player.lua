@@ -28,6 +28,10 @@ player.slashSpriteSheets = graphics.loadMulti("slash", 4, ".png", 5)
 player.dyingSpriteSheet = graphics.SpriteSheet:new("frogDying.png", 5)
 player.deadSpriteSheet = graphics.SpriteSheet:new("frogDead.png", 1)
 
+player.freezingSpriteSheet = graphics.SpriteSheet:new("frogFreezing.png", 4)
+player.frozenSpriteSheet = graphics.SpriteSheet:new("frogFrozen.png", 1)
+player.unfreezeSpriteSheet = graphics.SpriteSheet:new("frogUnfreezing.png", 8)
+
 
 player.moveSound = sound.SoundEffect:new("movement.ogg", 0.5)
 player.tongueLashSound = sound.SoundSet:new("tongueLash", 4, ".ogg", 0.2)
@@ -70,7 +74,7 @@ function player.Player:new(startSpace)
     
     body = bodies.WarpBody:new(startSpace),
     
-    energy = 40,
+    energy = 0,
     health = 5,
     
     drainingEnergy = false,
@@ -80,6 +84,12 @@ function player.Player:new(startSpace)
     eatBody = nil,  -- The body that the player is eating bugs from
     tongueBaseAnim = graphics.Animation:new(player.tongueBase),
     tongueTipAnim = graphics.Animation:new(player.tongueTip),
+    
+    freezing = false,
+    unfreezing = false,
+    freezingAnim = graphics.Animation:new(player.freezingSpriteSheet),
+    frozenAnim = graphics.Animation:new(player.frozenSpriteSheet),
+    unfreezingAnim = graphics.Animation:new(player.unfreezeSpriteSheet),
     
   }
   
@@ -98,6 +108,9 @@ function player.Player:new(startSpace)
   newObj.leapLandingAnim:setFrameLength(4)
   
   newObj.dyingAnim:setFrameLength(3)
+  
+  newObj.freezingAnim:setFrameLength(3)
+  newObj.unfreezingAnim:setFrameLength(3)
   
   graphics.setMultiAnimFrameLength(newObj.slashAnims, 4)
   
@@ -268,7 +281,27 @@ function player.Player:updateAnimation()
       self.animation = self.idleAnim
       self.landing = false
     end
+    
+  -- Animation for becoming frozen in the winter
+  elseif self.freezing then
+    self.freezingAnim:update()
+    
+    if self.freezingAnim.isDone then
+      self.freezingAnim:reset()
+      self.animation = self.frozenAnim
+      self.freezing = false
+    end
+    
+  elseif self.unfreezing then
+    self.unfreezingAnim:update()
+    
+    if self.unfreezingAnim.isDone then
+      self.unfreezingAnim:reset()
+      self.animation = self.idleAnim
+      self.unfreezing = false
+    end
   end
+  
   
   if self.gettingHurt then
     self.slashAnims[self.slashAnimNum]:update()
@@ -362,6 +395,30 @@ end
 --- Starts draining all of the player's energy.
 function player.Player:drainEnergy()
   self.drainingEnergy = true
+end
+
+
+function player.Player:freeze()
+  self.freezing = true
+  self.animation = self.freezingAnim
+end
+
+
+function player.Player:unfreeze()
+  self.unfreezing = true
+  self.animation = self.unfreezingAnim
+end
+
+
+function player.Player:transitionReset()
+  self.health = 5
+  self.energy = 0
+  self.animation = self.idleAnim
+  self.hasDied = false
+  self.eating = false
+  self.tongueBaseAnim:reset()
+  self.tongueTipAnim:reset()
+  deadFrame = 0
 end
 
 

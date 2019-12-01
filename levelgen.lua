@@ -29,7 +29,7 @@ function levelgen.testingLevel()
   level:mergeCoordinates(6, 3, 6, 4)
 
   level:refreshAllAdjacent()
-  --level:populate(3)
+  level:populate(3)
   
   return level
   
@@ -148,6 +148,14 @@ function levelgen.winterLevel()
   chanceAdd(level, 1, 4, 4, 2)
   chanceAdd(level, 1, 4, 6, 4)
   chanceAdd(level, 1, 4, 4, 6)
+  
+  -- Removes all hole decors since they don't change with the background color
+  for space, _ in pairs(level.spacesList) do
+    if space.decorNum and space.decorNum <= 16 then
+      space.decorNum = nil
+    end
+  end
+  
   
   level:refreshAllAdjacent()
   

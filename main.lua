@@ -144,6 +144,23 @@ mouseHoverSplash = sound.SoundSet:new("mouseHoverSplash", 3, ".ogg", 0.05)
 
 winterMusic = sound.FadableSound:new("winterMusic.ogg", 0.8, true)
 winterFreeze = sound.SoundSet:new("freeze", 1, ".ogg", 0.5)
+winterUnfreeze = sound.SoundSet:new("unfreeze", 1, ".ogg", 0.5)
+
+
+winSound = sound.SoundSet:new("win", 1, ".ogg", 0.5)
+loseSound = sound.SoundSet:new("lose", 1, ".ogg", 1)
+
+
+WATER_FADER_DEFAULT_LENGTH = 90
+WATER_FADER_SHORT_LENGTH = 30
+
+waterFaders = {}
+for i = 1, 3 do
+  local first = graphics.COLOR_NIGHT_WATER[i]
+  local last = graphics.COLOR_WATER[i]
+  waterFaders[i] = ui.Fader:new(first, last, WATER_FADER_DEFAULT_LENGTH)
+  waterFaders[i]:setValue(waterFaders[i].maxValue)
+end
 
 
 function debugTutorial(phase)
@@ -312,6 +329,13 @@ function updateGameplay()
   -- Updates the player dead timer
   if player.hasDied then
     deadFrame = deadFrame + 1
+    
+    if deadFrame == 1 then
+      music:fadeTo(0)
+    elseif deadFrame == YOU_DIED_FRAME then
+      loseSound:playRandom(1)
+    end
+    
   end
   
   if not screenTransition.activated and deadFrame >= CLICK_FOR_MENU_FRAME + 30 then
@@ -328,15 +352,16 @@ function updateGameplay()
       gridXOffset = level:centerScreenX(tileSize)
       gridYOffset = level:centerScreenY(tileSize)
       
+      player:transitionReset()
       player.body:goTo(level.spacesGrid[8][4])
-      player.animation = player.idleAnim
-      player.health = 5
-      player.energy = 0
-      player.hasDied = false
+      player.body.moveDirection = "up"
+      
       deadFrame = 0
   
       interface.energyBarFader:setValue(0)
       interface.heartVineFader:setValue(0)
+      
+      music:fadeTo(1)
     end
   end
   
@@ -537,11 +562,7 @@ function updateGameplay()
       if screenTransition.middleFrame then
         tutorialResetButton = nil
         
-        player.health = 5
-        player.energy = 0
-        player.animation = player.idleAnim
-        player.hasDied = false
-        deadFrame = 0
+        player:transitionReset()
         
         level = levelgen.tutorialLevelGenerators[tutorialPhase]()
         
@@ -822,7 +843,7 @@ function loadTakeoffCountdown()
   player:nextLeapReadyAnim()
   
   takeoffChargeSound:playRandom()
-  takeoffChargePhaseSounds:playID(1)
+  takeoffChargePhaseSounds:playID(1, 1)
 end
 
 
@@ -840,7 +861,7 @@ function updateTakeoffCountdown()
 
     
     if takeoffWaitCount == 3 then
-      takeoffChargePhaseSounds:playID(takeoffWaitCount + 1)
+      takeoffChargePhaseSounds:playID(takeoffWaitCount + 1, 1)
       loadTakeoff()
       
     else
@@ -854,7 +875,7 @@ function updateTakeoffCountdown()
         
       else
         player:nextLeapReadyAnim()
-        takeoffChargePhaseSounds:playID(takeoffWaitCount + 1)
+        takeoffChargePhaseSounds:playID(takeoffWaitCount + 1, 1)
       end
     end
     
@@ -1008,6 +1029,19 @@ function updateTakeoff()
   elseif takeoffFrame == TAKEOFF_PLAYER_DOWN_FRAME then
     rushingAir:fadeTo(0)
   end
+  
+  
+  -- Fades to night
+  if takeoffFrame == TAKEOFF_TEXT_FADE_IN_FRAME then
+    for i = 1, 3 do
+      waterFaders[i]:fadeDown()
+    end
+  elseif takeoffFrame == TAKEOFF_TEXT_FADE_OUT_FRAME - 20 then
+    for i = 1, 3 do
+      waterFaders[i]:fadeUp()
+    end
+  end
+  
   
 end
 
@@ -1283,6 +1317,10 @@ function loadWinter()
   playerMovement = nil
   player.flailing = false
   
+  for i = 1, 3 do
+    waterFaders[i]:setLength(WATER_FADER_SHORT_LENGTH)
+  end
+  
   winterFrame = 0  -- Starts after the frog lands
   winterFreezeDownY = -pixel * 24
   winterFreezeUpY = -pixel * 24
@@ -1397,9 +1435,18 @@ function updateWinter()
   -- When the ice shset goes back up
   elseif winterFrame < winterUnfreezeFrame then
     winterFreezeUpY = winterFreezeUpY + 30
-  
+    
+  elseif winterFrame == winterResultsFrame then
+    if player.energy > 0 then
+      winSound:playRandom(1)
+    else
+      loseSound:playRandom(1)
+    end
+    
   -- Frame when the buttons appear
   elseif winterFrame == winterButtonsFrame then
+    mouseClickSplash:playRandom()
+    
     if player.energy <= 0 then
       level:addSpace({{3, 7}, {4, 7}, {5, 7}})
       returnToMenuButton = level.spacesGrid[3][7]
@@ -1426,12 +1473,27 @@ function updateWinter()
   end
   
   if winterFrame == WINTER_START_WAIT_FRAME then
-    winterFreeze:playRandom()
+    winterFreeze:playRandom(1)
     winterMusic:play()
     winterMusic:fadeTo(1)
     
-  elseif winterFrame == winterUnfreezeFrame then
+    for i = 1, 3 do
+      waterFaders[i]:fadeDown()
+    end
+    
+    player:freeze()
+    
+  elseif winterFrame == winterFrozenFrame then
+    winterUnfreeze:playRandom(0.9)
+    for i = 1, 3 do
+      waterFaders[i]:fadeUp()
+    end
     winterMusic:fadeTo(0)
+    
+  elseif winterFrame == winterUnfreezeFrame + 60 then
+    if player.energy > 0 then
+      player:unfreeze()
+    end
   
   elseif winterFrame == winterResultsFrame then
     if player.energy > 0 then
@@ -1456,6 +1518,10 @@ function updateWinter()
         
         returnToMenuButton = nil
         continueButton = nil
+        
+        for i = 1, 3 do
+          waterFaders[i]:setLength(WATER_FADER_DEFAULT_LENGTH)
+        end
       end
       
     end
@@ -1468,6 +1534,7 @@ function updateWinter()
     gridXOffset = level:centerScreenX(tileSize)
     gridYOffset = level:centerScreenY(tileSize)
     
+    player.animation = player.idleAnim
     player.body:goTo(level.spacesGrid[8][4])
     player.energy = 0
     player.health = 5
@@ -1577,7 +1644,11 @@ function drawWinterText()
   if winterFrame >= winterButtonsFrame then
     love.graphics.setFont(graphics.tutorialFont)
     love.graphics.print("Main Menu", returnToMenuTextX + gridXOffset, returnToMenuTextY + gridYOffset)
-    love.graphics.print("Continue", continueTextX + gridXOffset, continueTextY + gridYOffset)
+    
+    if player.energy > 0 then
+      love.graphics.print("Continue", continueTextX + gridXOffset, continueTextY + gridYOffset)
+    end
+    
   end
 end
 
@@ -1632,7 +1703,7 @@ function love.load()
   totalFrames = 0
   
   
-  
+  --[[
   -- Starts the game on a level.
   onMenu = false
   
@@ -1650,7 +1721,7 @@ function love.load()
   
   gridXOffset = level:centerScreenX(tileSize)
   gridYOffset = level:centerScreenY(tileSize)
-  
+  ]]
   
   
   -- Starts the game on the winter phase
@@ -1691,7 +1762,10 @@ function love.update(dt)
   elseif phase == WINTER then
     updateWinter()
   end
-
+  
+  for i = 1, 3 do
+    waterFaders[i]:update()
+  end
 end
 
 
@@ -1699,6 +1773,13 @@ end
 function love.draw()
   
   love.graphics.setColor(graphics.COLOR_WHITE)
+  
+  local waterColor = {}
+  for i = 1, 3 do
+    waterColor[i] = waterFaders[i].value
+  end
+  
+  love.graphics.setBackgroundColor(waterColor)
   
   if phase == GAMEPLAY then
     drawGameplay()

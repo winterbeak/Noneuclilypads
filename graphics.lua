@@ -49,8 +49,9 @@ graphics.COLOR_LILLYPAD_HIGHLIGHT = graphics.convertColor({221, 221, 39})
 graphics.COLOR_LILLYPAD_SHADOW_HIGHLIGHT = graphics.convertColor({176, 176, 37})
 graphics.COLOR_LILLYPAD_OUTLINE_HIGHLIGHT = graphics.convertColor({114, 112, 17})
 
-graphics.COLOR_WATER = graphics.convertColor({0, 255, 182})
+graphics.COLOR_WATER = graphics.convertColor({1, 255, 182})
 graphics.COLOR_WATER_SHADOW = graphics.convertColor({0, 0, 0, 76})
+graphics.COLOR_NIGHT_WATER = graphics.convertColor({0, 70, 158})
 
 graphics.TRANSITION_COLOR = graphics.convertColor({0, 38, 74})
 

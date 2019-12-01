@@ -1,4 +1,5 @@
 graphics = require("graphics")
+sound = require("sound")
 
 local ui = {}
 
@@ -29,6 +30,10 @@ ui.energyBarX = 0
 ui.energyBarY = 0
 
 ui.energyBarPipeY = 0
+
+
+ui.energyBarUpSound = sound.SoundSet:new("energyBarUp", 3, ".ogg", 1)
+ui.loseHeartSound = sound.SoundSet:new("loseHeart", 1, ".ogg", 0.08)
 
 
 --- Updates the size and position of all of the sprites.
@@ -182,6 +187,8 @@ function ui.UI:update()
       self.gainingEnergy = true
       self.energyTopAnim = self.energyTopUpAnim
       self.energyTopUpAnim:reset()
+      
+      ui.energyBarUpSound:playRandom()
     end
     
   -- Updates the energy rising animation
@@ -228,6 +235,8 @@ function ui.UI:update()
     for i = self.player.health + 1, self.lastFrameHealth do
       self.heartsExploding[i] = true
     end
+    
+    ui.loseHeartSound:playRandom()
     
   elseif self.lastFrameHealth < self.player.health then
     for i = self.lastFrameHealth, self.player.health do

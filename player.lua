@@ -1,4 +1,5 @@
 graphics = require("graphics")
+sound = require("sound")
 bodies = require("bodies")
 misc = require("misc")
 
@@ -26,6 +27,12 @@ player.slashSpriteSheets = graphics.loadMulti("slash", 4, ".png", 5)
 
 player.dyingSpriteSheet = graphics.SpriteSheet:new("frogDying.png", 5)
 player.deadSpriteSheet = graphics.SpriteSheet:new("frogDead.png", 1)
+
+
+player.moveSound = sound.SoundEffect:new("movement.ogg", 0.5)
+player.tongueLashSound = sound.SoundSet:new("tongueLash", 4, ".ogg", 0.2)
+player.gulpSound = sound.SoundSet:new("gulp", 3, ".ogg", 0.85)
+
 
 player.Player = {}
 
@@ -63,7 +70,7 @@ function player.Player:new(startSpace)
     
     body = bodies.WarpBody:new(startSpace),
     
-    energy = 0,
+    energy = 40,
     health = 5,
     
     drainingEnergy = false,
@@ -105,6 +112,7 @@ end
 function player.Player:moveTo(space, direction)
   self.body:moveTo(space, direction)
   self.animation = self.jumpAnim
+  player.moveSound:play()
 end
 
 
@@ -223,6 +231,8 @@ function player.Player:updateAnimation()
       self.energy = self.energy + 1
       self.animation = self.idleAnim
       self.eating = false
+      
+      player.gulpSound:playRandom()
     end
     
   -- Animation for getting ready to leap between islands
@@ -315,6 +325,8 @@ function player.Player:eatBug(space)
   self.eatBody = space.occupiedBy
   self.body.moveDirection = direction
   self.animation = self.tongueBaseAnim
+  
+  player.tongueLashSound:playRandom()
 end
 
 

@@ -11,6 +11,10 @@ slug.readySpriteSheets = graphics.loadMulti("slugReady", 3, ".png", 27)
 slug.attackSpriteSheets = graphics.loadMulti("slugAttack", 3, ".png", 4)
 slug.slurpSpriteSheet = graphics.SpriteSheet:new("slugSlurp.png", 7)
 
+slug.idleSound = sound.SoundSet:new("slugIdle", 6, ".ogg", 0.9)
+slug.attackSound = sound.SoundSet:new("slugAttack", 4, ".ogg", 0.6)
+slug.mergeSound = sound.SoundSet:new("slugMerge", 1, ".ogg", 0.6)
+
 slug.Slug = {}
 
 --- Constructor.  Makes a Slug enemy.
@@ -31,7 +35,9 @@ function slug.Slug:new(startSpace)
     animation = nil,
     
     body = bodies.WarpBody:new(startSpace),
-    slimedSpaces = {}
+    slimedSpaces = {},
+    
+    soundTimer = math.random(1, 1200),
   }
   
   newObj.body.moveDirection = misc.randomDirection()
@@ -77,6 +83,8 @@ end
 -- If a space is occupied, it will NOT be merged.
 function slug.Slug:mergeSlimed(level)
   
+  slug.mergeSound:playRandom()
+  
   -- Removes any spaces that are occupied
   for i = 1, #self.slimedSpaces do
     if self.slimedSpaces[i] then
@@ -121,6 +129,8 @@ function slug.Slug:takeTurn(level, player)
       self.animation = self.attackAnims[self.moveTimer / 2]
       self.attacking = true
       self.body.moveDirection = self.body.space:directionOf(player.body.space)
+      
+      slug.attackSound:playRandom()
       
     -- Otherwise, just move normally
     else
@@ -226,6 +236,7 @@ function slug.Slug:updateAnimation()
       self.animation:reset()
       self.animation = self.idleAnims[(self.moveTimer / 2) + 1]
       self.attacking = false
+      
     end
     
   elseif self.moveTimer % 2 == 1 and self.moveTimer ~= 7 then
@@ -252,6 +263,13 @@ function slug.Slug:updateAnimation()
   end
   
   self.body:updateBugs()
+  
+  -- Updates the sound timer
+  self.soundTimer = self.soundTimer - 1
+  if self.soundTimer <= 0 then
+    self.soundTimer = math.random(600, 1200)
+    slug.idleSound:playRandom()
+  end
 end
 
 

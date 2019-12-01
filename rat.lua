@@ -1,4 +1,5 @@
 graphics = require("graphics")
+sound = require("sound")
 bodies = require("bodies")
 misc = require("misc")
 
@@ -10,6 +11,9 @@ rat.idle1SpriteSheet = graphics.SpriteSheet:new("ratIdle1.png", 1)
 rat.idle2SpriteSheet = graphics.SpriteSheet:new("ratIdle2.png", 12)
 rat.jumpSpriteSheet = graphics.SpriteSheet:new("ratJump.png", 8)
 rat.attackSpriteSheet = graphics.SpriteSheet:new("ratAttack.png", 6)
+
+rat.idleSound = sound.SoundSet:new("ratSqueak", 6, ".ogg", 0.3)
+rat.attackSound = sound.SoundSet:new("ratAttack", 4, ".ogg", 0.3)
 
 
 rat.Rat = {}
@@ -29,6 +33,8 @@ function rat.Rat:new(startSpace)
     animation = nil,
     
     body = bodies.WarpBody:new(startSpace),
+    
+    soundTimer = math.random(1, 1200),
   }
   
   newObj.body.moveDirection = misc.randomDirection()
@@ -84,6 +90,8 @@ function rat.Rat:takeTurn(level, player)
       self.animation = self.attackAnim
       self.attacking = true
       self.body.moveDirection = self.body.space:directionOf(player.body.space)
+      
+      rat.attackSound:playRandom()
       
     -- Otherwise, just move normally
     else
@@ -174,6 +182,13 @@ function rat.Rat:updateAnimation()
   end
   
   self.body:updateBugs()
+  
+  -- Updates the sound timer
+  self.soundTimer = self.soundTimer - 1
+  if self.soundTimer <= 0 then
+    self.soundTimer = math.random(600, 1200)
+    rat.idleSound:playRandom()
+  end
   
 end
 

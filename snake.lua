@@ -23,6 +23,8 @@ snake.attackStraightSpriteSheet = graphics.SpriteSheet:new("snakeAttackStraight.
 snake.attackClockwiseSpriteSheet = graphics.SpriteSheet:new("snakeAttackClockwise.png", 7)
 snake.attackCounterClockwiseSpriteSheet = graphics.SpriteSheet:new("snakeAttackCounterClockwise.png", 7)
 
+snake.idleSound = sound.SoundSet:new("snakeHiss", 6, ".ogg", 0.3)
+snake.attackSound = sound.SoundSet:new("snakeAttack", 4, ".ogg", 0.3)
 
 snake.Snake = {}
 
@@ -50,7 +52,9 @@ function snake.Snake:new(spaceList, directionList)
     bodyList = {},
     
     -- Stores direction of tail before a movement, so that during the movement it can be drawn properly
-    previousTailDirection = nil
+    previousTailDirection = nil,
+    
+    soundTimer = math.random(1, 1200),
   }
   
   if newObj.moveTimer == 1 then
@@ -345,6 +349,8 @@ function snake.Snake:takeTurn(level, player)
         self.headAnimation = self.attackCounterClockwiseAnim
       end
       
+      snake.attackSound:playRandom()
+      
     -- Otherwise, just move normally
     else
       self:move(player)
@@ -573,6 +579,13 @@ function snake.Snake:updateAnimation()
   
   for i = 1, snake.LENGTH do
     self.bodyList[i]:updateBugs()
+  end
+  
+  -- Updates the sound timer
+  self.soundTimer = self.soundTimer - 1
+  if self.soundTimer <= 0 then
+    self.soundTimer = math.random(600, 1200)
+    snake.idleSound:playRandom()
   end
 end
 

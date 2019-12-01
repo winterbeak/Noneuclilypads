@@ -9,9 +9,10 @@ grid = require("grid")
 entities = require("entities")
 spaces = require("spaces")
 graphics = require("graphics")
+sound = require("sound")
 levelgen = require("levelgen")
 ui = require("ui")
-
+transition = require("transition")
 
 GAMEPLAY = 0
 TAKEOFF_COUNTDOWN = 1
@@ -95,7 +96,7 @@ level = nil  -- Level grid object
 onMenu = true
 onTutorial = false
 
-screenTransition = graphics.ScreenTransition:new()
+screenTransition = transition.ScreenTransition:new()
 tutorialResetButton = nil
 
 survivedWinter = false
@@ -111,6 +112,38 @@ takeoffFromWinter = false
 takeoffFromMenu = false
 
 title = graphics.SpriteSheet:new("title.png", 1)
+
+
+music = sound.FadableSound:new("ambience.flac", 0.6, true)
+music:play()
+
+
+rushingAir = sound.FadableSound:new("rushingAir.ogg", 1, true)
+rushingAir:setVolume(0)
+rushingAir:play()
+
+
+takeoffChargeSound = sound.SoundSet:new("chargeJump", 1, ".ogg", 0.25)
+takeoffChargePhaseSounds = sound.SoundSet:new("chargePhase", 4, ".ogg", 0.2)
+islandJumpSound = sound.SoundSet:new("islandJump", 3, ".ogg", 0.55)
+
+landingWhoosh = sound.SoundSet:new("landingWhoosh", 1, ".ogg", 0.2)
+landingSound = sound.SoundSet:new("tongueLash", 4, ".ogg", 0.2)
+
+
+tutorialWhoosh = sound.SoundSet:new("tutorialTransition", 1, ".ogg", 1)
+
+
+mouseHoverSpace = nil
+previousMouseHoverSpace = nil
+mouseClickSpace = nil
+previousMouseClickSpace = nil
+mouseClickSplash = sound.SoundSet:new("mouseReleaseSplash", 3, ".ogg", 0.1)
+mouseHoverSplash = sound.SoundSet:new("mouseHoverSplash", 3, ".ogg", 0.05)
+
+
+winterMusic = sound.FadableSound:new("winterMusic.ogg", 0.8, true)
+winterFreeze = sound.SoundSet:new("freeze", 1, ".ogg", 0.5)
 
 
 function debugTutorial(phase)
@@ -138,7 +171,7 @@ function changePixel(value)
   gridYOffset = math.floor((love.graphics.getHeight() - (level.height * tileSize)) / 2)
   
   -- Creates a new screen transition to match the size of the screen
-  screenTransition = graphics.ScreenTransition:new()
+  screenTransition = transition.ScreenTransition:new()
   
 end
 
@@ -259,7 +292,7 @@ end
 
 
 function updateGameplay()
-
+  
   player:updateAnimation()
   level:updateEnemies()
   level:updateAllSpaces()
@@ -382,6 +415,48 @@ function updateGameplay()
   end
   
   
+  if mouseSpace then
+    
+    local mouseHighlight = false
+    
+    if player.hasDied then
+      
+    elseif mouseSpace.isButton then
+      mouseHighlight = true
+      
+    elseif mouseSpace.occupiedBy == player.body then
+      mouseHighlight = true
+      
+    elseif player.body.space.adjacentList[mouseSpace] then
+      if not (mouseSpace:isOccupied() and (#mouseSpace.occupiedBy.bugs <= 0)) then
+        mouseHighlight = true
+      end
+      
+    end
+    
+    if mouseHighlight then
+      if mouseClicked then
+        mouseClickSpace = mouseSpace
+      else
+        mouseHoverSpace = mouseSpace
+      end
+    end
+    
+    if mouseHoverSpace and mouseHoverSpace ~= previousMouseHoverSpace then
+      mouseHoverSplash:playRandom()
+    end
+    
+    if mouseClickSpace and mouseClickSpace ~= previousMouseClickSpace then
+      mouseClickSplash:playRandom()
+    end
+  end
+  
+  previousMouseHoverSpace = mouseHoverSpace
+  mouseHoverSpace = nil
+  previousMouseClickSpace = mouseClickSpace
+  mouseClickSpace = nil
+  
+  
   -- What happens when the mouse is clicked
   local movementAttempted = mouseReleased and mouseSpace
   local lockedMovement = lockMovement or player.hasDied
@@ -394,12 +469,14 @@ function updateGameplay()
     
     -- If you click on the player's space, start the level transition
     if mouseSpace.occupiedBy == player.body then
+      --mouseReleaseSplash:playRandom()
+      
       if not (onMenu or onTutorial) then
         loadTakeoffCountdown()
       end
       
-      
     elseif player.body.space.adjacentList[mouseSpace] then
+      
       if mouseSpace:isOccupied() then
         
         if #mouseSpace.occupiedBy.bugs > 0 then
@@ -416,6 +493,7 @@ function updateGameplay()
     end
     
     if validMove then
+      --mouseReleaseSplash:playRandom()
       
       lockInput(TURN_DELAY)
       
@@ -707,7 +785,7 @@ function drawGameplay()
   
   -- Draws the logo on the main menu
   if onMenu or tutorialShowTitle then
-    title:draw(1, gridXOffset + pixel * 4, gridYOffset + pixel * 20, pixel)
+    title:draw(1, gridXOffset + pixel * 4, gridYOffset + pixel * 37, pixel)
   end
   
   -- Draws the text on the tutorial reset button
@@ -742,6 +820,9 @@ function loadTakeoffCountdown()
   player.body.moveDirection = "up"
   player.readyingLeap = true
   player:nextLeapReadyAnim()
+  
+  takeoffChargeSound:playRandom()
+  takeoffChargePhaseSounds:playID(1)
 end
 
 
@@ -756,18 +837,24 @@ function updateTakeoffCountdown()
   if takeoffCountdownTimer == TAKEOFF_COUNTDOWN_WAIT_LENGTH then
     takeoffCountdownTimer = 0
     takeoffWaitCount = takeoffWaitCount + 1
+
     
     if takeoffWaitCount == 3 then
+      takeoffChargePhaseSounds:playID(takeoffWaitCount + 1)
       loadTakeoff()
+      
     else
       level:updateDistances(player.body.space)
       level:doEnemyTurns(player)
+      
       if player.hasDied then
-        print(player.dyingAnim, player.animation)
+        takeoffChargeSound:stop()
         player.readyingLeap = false
         loadGameplay()
+        
       else
         player:nextLeapReadyAnim()
+        takeoffChargePhaseSounds:playID(takeoffWaitCount + 1)
       end
     end
     
@@ -789,7 +876,7 @@ function drawTakeoffCountdown()
   end
   
   if takeoffFromMenu then
-    title:draw(1, gridXOffset + pixel * 4, gridYOffset + pixel * 20, pixel)
+    title:draw(1, gridXOffset + pixel * 4, gridYOffset + pixel * 37, pixel)
   end
   
   level:drawEnemies(gridXOffset, gridYOffset, pixel, tileSize)
@@ -828,6 +915,9 @@ function loadTakeoff()
   -- Resets fade length to defaults
   interface.heartVineFader:setLength(ui.DEFAULT_FADE_LENGTH)
   interface.energyBarFader:setLength(ui.DEFAULT_FADE_LENGTH)
+  
+  takeoffChargeSound:stop()
+  islandJumpSound:playRandom()
   
 end
 
@@ -913,6 +1003,12 @@ function updateTakeoff()
     end
   end
   
+  if takeoffFrame == TAKEOFF_WAIT_FRAME then
+    rushingAir:fadeTo(1)
+  elseif takeoffFrame == TAKEOFF_PLAYER_DOWN_FRAME then
+    rushingAir:fadeTo(0)
+  end
+  
 end
 
 
@@ -932,7 +1028,7 @@ function drawTakeoff()
       drawWinterText()
     end
     if takeoffFromMenu then
-      title:draw(1, gridXOffset + pixel * 4, gridYOffset + pixel * 20, pixel)
+      title:draw(1, gridXOffset + pixel * 4, gridYOffset + pixel * 37, pixel)
     end
     
     level:drawEnemies(gridXOffset, gridYOffset, pixel, tileSize)
@@ -1026,6 +1122,29 @@ function updateChooseSpace()
   interface:update()
   
   
+  -- Plays the lillypad selecting sounds
+  if mouseSpace and not mouseSpace:isOccupied() then
+    if mouseClicked then
+      mouseClickSpace = mouseSpace
+    else
+      mouseHoverSpace = mouseSpace
+    end
+    
+    if mouseHoverSpace and mouseHoverSpace ~= previousMouseHoverSpace then
+      mouseHoverSplash:playRandom()
+    end
+    
+    if mouseClickSpace and mouseClickSpace ~= previousMouseClickSpace then
+      mouseClickSplash:playRandom()
+    end
+  end
+  
+  previousMouseHoverSpace = mouseHoverSpace
+  previousMouseClickSpace = mouseClickSpace
+  mouseHoverSpace = nil
+  mouseClickSpace = nil
+  
+  
   if movementFrame < LAST_LEVEL_MOVEMENT_FRAME then
     movementFrame = movementFrame + 1
     
@@ -1058,6 +1177,8 @@ function updateChooseSpace()
         
         level:updateDistances(player.body.space)
         level:doEnemyTurns(player)
+        
+        landingSound:playRandom()
         loadGameplay()
       end
     end
@@ -1082,6 +1203,8 @@ function updateChooseSpace()
       player.animation = player.leapLandingAnim
       
       playerTransitionX = gridXOffset
+      
+      landingWhoosh:playRandom()
       
     end
     
@@ -1139,6 +1262,8 @@ end
 
 
 function loadWinter()
+  music:fadeTo(0)
+  
   phase = WINTER
   
   level = levelgen.winterLevel()
@@ -1162,7 +1287,7 @@ function loadWinter()
   winterFreezeDownY = -pixel * 24
   winterFreezeUpY = -pixel * 24
   
-  WINTER_START_WAIT_LENGTH = 30
+  WINTER_START_WAIT_LENGTH = 45
   WINTER_FREEZE_LENGTH = 30
   
   -- Energy decreases once every 9 frames, so the minimum energy requirement is
@@ -1219,6 +1344,9 @@ function updateWinter()
         player.landing = true
         playerTransitionX = gridXOffset
         playerTransitionY = gridYOffset
+        
+        landingSound:playRandom()
+        
       end
     
     -- Every frame after landing, this increases
@@ -1247,6 +1375,7 @@ function updateWinter()
     
     playerTransitionX = gridXOffset
     
+    landingWhoosh:playRandom()
   end
   
   -- Stuff during the winter
@@ -1296,6 +1425,21 @@ function updateWinter()
     end
   end
   
+  if winterFrame == WINTER_START_WAIT_FRAME then
+    winterFreeze:playRandom()
+    winterMusic:play()
+    winterMusic:fadeTo(1)
+    
+  elseif winterFrame == winterUnfreezeFrame then
+    winterMusic:fadeTo(0)
+  
+  elseif winterFrame == winterResultsFrame then
+    if player.energy > 0 then
+      music:fadeTo(1)
+    end
+  end
+  
+  
   -- If the screen transition has not been activated, allow clicking on buttons
   if not screenTransition.activated then
     
@@ -1334,8 +1478,33 @@ function updateWinter()
     interface.heartVineFader:setValue(0)
     interface.energyBarFader:setValue(0)
     
+    music:fadeTo(1)
+    
     loadGameplay()
   end
+  
+  
+  -- Mouse button sounds
+  if mouseSpace and mouseSpace.isButton then
+    if mouseClicked then
+      mouseClickSpace = mouseSpace
+    else
+      mouseHoverSpace = mouseSpace
+    end
+  end
+    
+  if mouseHoverSpace and mouseHoverSpace ~= previousMouseHoverSpace then
+    mouseHoverSplash:playRandom()
+  end
+    
+  if mouseClickSpace and mouseClickSpace ~= previousMouseClickSpace then
+    mouseClickSplash:playRandom()
+  end
+  
+  previousMouseHoverSpace = mouseHoverSpace
+  previousMouseClickSpace = mouseClickSpace
+  mouseHoverSpace = nil
+  mouseClickSpace = nil
 
 end
 
@@ -1405,11 +1574,9 @@ function drawWinterText()
     
   end
   
-  love.graphics.setFont(graphics.tutorialFont)
-  if returnToMenuButton then
+  if winterFrame >= winterButtonsFrame then
+    love.graphics.setFont(graphics.tutorialFont)
     love.graphics.print("Main Menu", returnToMenuTextX + gridXOffset, returnToMenuTextY + gridYOffset)
-  end
-  if continueButton then
     love.graphics.print("Continue", continueTextX + gridXOffset, continueTextY + gridYOffset)
   end
 end
@@ -1428,6 +1595,8 @@ function loadTutorialTransition()
   first = -love.graphics.getHeight() - pixel * 50
   last = tutorialNextLevel:centerScreenY(tileSize)
   tutorialMoveCurrent = movement.Sine:newFadeOut(first, last, 70)
+  
+  tutorialWhoosh:playRandom()
 end
 
 
@@ -1463,24 +1632,25 @@ function love.load()
   totalFrames = 0
   
   
-  --[[
+  
   -- Starts the game on a level.
   onMenu = false
   
-  level = levelgen.testingLevel()
+  level = levelgen.randomLevel()
+  --level = levelgen.testingLevel()
   --level:addEnemy(entities.Rat:new(level.spacesGrid[5][4]))
   --level:addEnemy(entities.Snake:newRandom(level.spacesGrid[5][5]))
   --level:addEnemy(entities.Snake:newRandom(level.spacesGrid[6][7]))
-  level:addEnemy(entities.Slug:new(level.spacesGrid[7][1]))
+  --level:addEnemy(entities.Slug:new(level.spacesGrid[7][1]))
   
-  player.body:goTo(level.spacesGrid[2][2])
+  player.body:goTo(level.spacesGrid[3][3])
   
   interface.energyBarFader:setValue(1)
   interface.heartVineFader:setValue(1)
   
   gridXOffset = level:centerScreenX(tileSize)
   gridYOffset = level:centerScreenY(tileSize)
-  ]]
+  
   
   
   -- Starts the game on the winter phase
@@ -1495,6 +1665,10 @@ end
 --- Runs every frame.
 function love.update(dt)
   screenTransition:update()
+  
+  music:update()
+  rushingAir:update()
+  winterMusic:update()
   
   -- Updates fps
   if showFPS then
